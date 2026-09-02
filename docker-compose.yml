@@ -1,0 +1,143 @@
+# SIH26183 - Fraud-Linked Exchange Identification - local/demo stack.
+# Compose v2.20+ / v5.x : the top-level `version:` key is obsolete and omitted.
+#
+# HOST PORTS: this project deliberately uses a non-default host port block
+# (5434 / 7475 / 7688 / 6380 / 8001 / 5174) so it can run side by side with
+# another local stack holding the conventional ports. Container-internal ports
+# are unchanged. Override any of them in .env.
+name: sih183
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sih183-postgres
+    environment:
+      POSTGRES_USER: sih
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sihdev}
+      POSTGRES_DB: sih183
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sih -d sih183"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: sih183-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-sihdevpass}
+      NEO4J_PLUGINS: '["graph-data-science","apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
+      NEO4J_dbms_security_procedures_allowlist: "gds.*,apoc.*"
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1G
+    ports:
+      - "${NEO4J_HTTP_PORT:-7475}:7474"   # HTTP / Neo4j Browser
+      - "${NEO4J_BOLT_PORT:-7688}:7687"   # Bolt
+    volumes:
+      - neo4jdata:/data
+      - neo4jlogs:/logs
+      # NOTE: infra/neo4j is NOT mounted here. The Neo4j entrypoint chowns its
+      # import dir, which fails on a read-only bind mount. The constraints in
+      # init.cypher are applied by the backend at startup instead, so the file
+      # is mounted into the backend container below.
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      # Loading the GDS + APOC plugins takes ~85s on a cold start; a shorter
+      # start_period makes compose declare the service unhealthy before Neo4j
+      # has bound its HTTP listener.
+      start_period: 150s
+
+  redis:
+    image: redis:7-alpine
+    container_name: sih183-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  backend:
+    build:
+      context: ./backend
+    container_name: sih183-backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://sih:${POSTGRES_PASSWORD:-sihdev}@postgres:5432/sih183
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-sihdevpass}
+      REDIS_URL: redis://redis:6379/0
+      DEMO_MODE: ${DEMO_MODE:-true}
+      # Lets ml/src/*.py import the app package when run via `compose exec`.
+      PYTHONPATH: /app
+      # uvicorn --reload watches via `watchfiles`, which relies on OS-level
+      # filesystem events. Those do not cross a Windows bind mount into the
+      # Linux VM, so edits on the host were never seen and the container kept
+      # serving stale code. Polling is slower but actually works here.
+      WATCHFILES_FORCE_POLLING: "true"
+      CORS_ORIGINS: http://localhost:${FRONTEND_PORT:-5174}
+    ports:
+      - "${BACKEND_PORT:-8001}:8000"
+    volumes:
+      - ./backend:/app
+      - ./ml/artifacts:/app/ml_artifacts:ro
+      # Writable: scripts/generate_synthetic_complaints.py emits the dataset here.
+      - ./ml/seeds:/app/ml_seeds
+      - ./infra/neo4j:/app/infra/neo4j:ro
+      - ./scripts:/app/scripts:ro
+      # Whole ml/ tree: src (seed + train scripts), data, artifacts, seeds.
+      - ./ml:/app/ml
+      - backendstorage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health/live').status==200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: sih183-frontend
+    environment:
+      VITE_API_BASE: http://localhost:${BACKEND_PORT:-8001}
+      VITE_WS_URL: ws://localhost:${BACKEND_PORT:-8001}/api/v1/ws/alerts
+    ports:
+      - "${FRONTEND_PORT:-5174}:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+
+volumes:
+  pgdata:
+  neo4jdata:
+  neo4jlogs:
+  redisdata:
+  backendstorage:

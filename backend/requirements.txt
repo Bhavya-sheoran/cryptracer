@@ -1,0 +1,34 @@
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic>=2.9
+pydantic-settings>=2.6
+sqlalchemy>=2.0.36
+psycopg[binary]>=3.2
+alembic>=1.14
+neo4j>=5.26
+redis>=5.2
+httpx>=0.28
+python-jose[cryptography]>=3.3
+# bcrypt used directly - passlib 1.7.4 breaks against bcrypt 4.1+ (see services/auth.py)
+bcrypt>=4.1
+python-multipart>=0.0.17
+base58>=2.1.1
+pycryptodome>=3.21
+PyYAML>=6.0
+numpy>=2.1
+pandas>=2.2
+scikit-learn>=1.5
+# xgboost-cpu, not xgboost: identical `import xgboost`, but without the
+# nvidia-nccl-cu12 (~342 MB) GPU dependency that the normal distribution
+# declares on Linux from 2.1 onward. This project trains and infers on CPU
+# only. The model artifact is written with the native Booster API, so it
+# loads identically here.
+xgboost-cpu>=2.1
+
+# --- Phase 4: reports -------------------------------------------------------
+# fpdf2 is pure Python with no system libraries, unlike reportlab/weasyprint.
+fpdf2>=2.8
+joblib>=1.4
+pytest>=8.3
+pytest-asyncio>=0.24
+ruff>=0.8

@@ -1,0 +1,1262 @@
+{
+  "meta": {
+    "notice": "SYNTHETIC DATA - generated for demonstration. Contains no real NCRP complaint data, no real exchange KYC data, and no real on-chain activity. Exchange and service names are fictional.",
+    "seed": 26183,
+    "generated_at": "2026-09-01T12:48:29.400910+00:00",
+    "generator": "scripts/generate_synthetic_complaints.py",
+    "is_synthetic": true
+  },
+  "entities": [
+    {
+      "name": "Meridian Exchange",
+      "entity_type": "exchange",
+      "jurisdiction": "Seychelles",
+      "website": "https://meridianexchange.example",
+      "addresses": [
+        {
+          "chain": "TRON",
+          "address": "TRyRpB9pg4aegknQoXD4HpBJZN9xY4zqub",
+          "label": "Meridian Exchange hot wallet 1"
+        }
+      ]
+    },
+    {
+      "name": "Cyclone Pool",
+      "entity_type": "mixer",
+      "jurisdiction": "unknown",
+      "website": null,
+      "addresses": [
+        {
+          "chain": "ETH",
+          "address": "0x06A3a95E2D4c71355813c7F19BfB542F5abCa430",
+          "label": "Cyclone Pool pool"
+        }
+      ]
+    },
+    {
+      "name": "Northwind Digital",
+      "entity_type": "exchange",
+      "jurisdiction": "Estonia",
+      "website": "https://northwinddigital.example",
+      "addresses": [
+        {
+          "chain": "ETH",
+          "address": "0xfABd3344eAdefaF3BF1f572D5a51022E917d2C5D",
+          "label": "Northwind Digital hot wallet 1"
+        }
+      ]
+    },
+    {
+      "name": "Kestrel Trade",
+      "entity_type": "exchange",
+      "jurisdiction": "Singapore",
+      "website": "https://kestreltrade.example",
+      "addresses": [
+        {
+          "chain": "BTC",
+          "address": "13HMHzQuYT3MvCxzxneQuaT56VazLMpW8P",
+          "label": "Kestrel Trade hot wallet 1"
+        },
+        {
+          "chain": "BTC",
+          "address": "3DKUuePihdsV42MeMUEBn2k726CU3vGqjj",
+          "label": "Kestrel Trade deposit pool"
+        }
+      ]
+    }
+  ],
+  "transactions": [
+    {
+      "chain": "TRON",
+      "txid": "0x0da700109039ae27cf9df52f156ef4ba2650a661b6cf0f36b354dd8ecf6525ee",
+      "timestamp": "2026-07-29T20:48:29.400910+00:00",
+      "block_height": 800001,
+      "fee": 0.598,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TCZ9aBVBPYimLCFGi18FYBTV9FHd5riBQX",
+          "value": 5988.21494,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TFxXYrP93fNJjoFKa2EaVU8UM3FqabDJ8a",
+          "value": 5988.21494,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0x2ab0b62fb17c5e49d189b7c12b653d2ee6434910f9c8c701e16570ff458c354a",
+      "timestamp": "2026-05-16T01:48:29.400910+00:00",
+      "block_height": 800002,
+      "fee": 0.6691,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TMVJx6jKvXshkPXkXYFYoWuTWWDNqfr2B6",
+          "value": 9512.537975,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TVJBa9b12oLrmBDbZVqZvNHjU6JGskhJ17",
+          "value": 9512.537975,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0x7b63ce940a2b7b256558ed7e37510924e4d8f401d6f234d8a94df04b2fc4d3b4",
+      "timestamp": "2026-08-19T10:48:29.400910+00:00",
+      "block_height": 800003,
+      "fee": 1.6448,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TCigMu3azzr3spk9kRYYv4GTEEwddFSXTK",
+          "value": 2146.22899,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TLQZih91RAG6U3cziN4LWPdTQx91npXDnt",
+          "value": 2146.22899,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0x7c314813eba719ba3bd68e2b28a3661175b8bbcedc689b7127fa7d6668cf1034",
+      "timestamp": "2026-06-07T11:48:29.400910+00:00",
+      "block_height": 800004,
+      "fee": 1.1795,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TAXSFQ6dnPYNCaX6hwa6Wa8b5YFVWj8X4Q",
+          "value": 8240.558016,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TDBJYM5cFMLSNvtJtrnkikpsJaZYpdFPEn",
+          "value": 8240.558016,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0x64e71f8c459e2593f2286f67216c930a3064000679b4ec7208820fafa06c83b9",
+      "timestamp": "2026-06-11T21:48:29.400910+00:00",
+      "block_height": 800005,
+      "fee": 0.6769,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TNo5Ramd76ibGdKGddE5erreBfhhVBJGDT",
+          "value": 2847.857916,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TE1BAmn8FgeqEDs25YjmGsNco3FZZi1wVT",
+          "value": 2847.857916,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0xf4059f7ce7735e3bd6f69896f39930a7e8883f16a99c0004bccff401989897bd",
+      "timestamp": "2026-04-18T16:48:29.400910+00:00",
+      "block_height": 800006,
+      "fee": 1.6141,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TLSzhH4JAx57Murydokp9YYVKpDLzfMtsR",
+          "value": 1418.179513,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TDTCu1ztPn8rAEMRZkKGTjKrdikt2Byocb",
+          "value": 1418.179513,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0x4db9d2456dea75f68e5ec846ef89d47f6e13068109237d960f87ab7e16aef5f9",
+      "timestamp": "2026-05-31T12:48:29.400910+00:00",
+      "block_height": 800007,
+      "fee": 0.2837,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TFxXYrP93fNJjoFKa2EaVU8UM3FqabDJ8a",
+          "value": 7.921318,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TUQmoG7ktMRqMBvMToLokkQuNRG2nar427",
+          "value": 7.802499,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0x96924ce39e8d8f012d01e025d0d402e58a3349161fb7d44b2d9520560272c103",
+      "timestamp": "2026-08-19T12:48:29.400910+00:00",
+      "block_height": 800008,
+      "fee": 1.6414,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TVJBa9b12oLrmBDbZVqZvNHjU6JGskhJ17",
+          "value": 4.839873,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TToNe4fFDG543XQmHqAjHojLwr7e7iY3HJ",
+          "value": 4.767275,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0xdf0d36dc62aa44540bb616d921c29adf0ba2dc17d8e55b5a95c6a7edbfe2dd7b",
+      "timestamp": "2026-07-26T12:48:29.400910+00:00",
+      "block_height": 800009,
+      "fee": 1.3909,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TLQZih91RAG6U3cziN4LWPdTQx91npXDnt",
+          "value": 6.764821,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TGDLocnBhqTnFWKEwxa9bxhGufANtgRwHV",
+          "value": 6.663349,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0x5ab11d4ca0eabab79a74f81782fb91485fc3ec6d1a683b9ed847c74868ab990a",
+      "timestamp": "2026-07-11T12:48:29.400910+00:00",
+      "block_height": 800010,
+      "fee": 0.2797,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TDBJYM5cFMLSNvtJtrnkikpsJaZYpdFPEn",
+          "value": 3.352883,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TUQmoG7ktMRqMBvMToLokkQuNRG2nar427",
+          "value": 3.30259,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0x159fef8cfaff37418e265e3e4c04315c3cee74a7af603cfc9ccfdd3eb71a5f8b",
+      "timestamp": "2026-06-18T12:48:29.400910+00:00",
+      "block_height": 800011,
+      "fee": 0.6713,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TE1BAmn8FgeqEDs25YjmGsNco3FZZi1wVT",
+          "value": 6.657979,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TToNe4fFDG543XQmHqAjHojLwr7e7iY3HJ",
+          "value": 6.558109,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0xd8b381fccf00ff48f5c82d97528ded3eab54b767991348b4888525f603ff4a3e",
+      "timestamp": "2026-04-25T12:48:29.400910+00:00",
+      "block_height": 800012,
+      "fee": 0.5022,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TDTCu1ztPn8rAEMRZkKGTjKrdikt2Byocb",
+          "value": 4.017722,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TGDLocnBhqTnFWKEwxa9bxhGufANtgRwHV",
+          "value": 3.957456,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0x9f6cd7a700d863174242358be5e0472ea7f783f761de9d29bc75327181fa93d4",
+      "timestamp": "2026-06-16T11:48:29.400910+00:00",
+      "block_height": 800013,
+      "fee": 0.7765,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TUQmoG7ktMRqMBvMToLokkQuNRG2nar427",
+          "value": 6.479943,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TSfq4C7hwiMHBYBgMB9kdxm5xNjpNjdTJG",
+          "value": 6.382744,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0xa45164ed142af79cdc3ba7d182cb8f2ab628fbd0209b41981d22efa7486ff0a3",
+      "timestamp": "2026-06-09T11:48:29.400910+00:00",
+      "block_height": 800014,
+      "fee": 1.2454,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TToNe4fFDG543XQmHqAjHojLwr7e7iY3HJ",
+          "value": 6.213845,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TSfq4C7hwiMHBYBgMB9kdxm5xNjpNjdTJG",
+          "value": 6.120638,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0x529a52d00f4919f6064ce837e2d03ddc2fbad64c0cf1bda6ab17ed86a78b4088",
+      "timestamp": "2026-06-29T11:48:29.400910+00:00",
+      "block_height": 800015,
+      "fee": 1.0373,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TGDLocnBhqTnFWKEwxa9bxhGufANtgRwHV",
+          "value": 8.055087,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TSfq4C7hwiMHBYBgMB9kdxm5xNjpNjdTJG",
+          "value": 7.934261,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0x15ac9925337a685395da53fab2ea6571bd24cc880e16367be445c0fc7bb653f2",
+      "timestamp": "2026-08-12T12:48:29.400910+00:00",
+      "block_height": 800016,
+      "fee": 0.9063,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TSfq4C7hwiMHBYBgMB9kdxm5xNjpNjdTJG",
+          "value": 7.05046,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TJkV6dwUb2N8kr74bTy3JGoaA1e2JdCYso",
+          "value": 0.499798,
+          "index": 0,
+          "is_change": false
+        },
+        {
+          "address": "TKN8ZhMgqwwezEwDicm6jxzXDRofLy24X8",
+          "value": 6.550662,
+          "index": 1,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0x20f72ccf39ccd450c13572f0e98160a97af638e6e93ce3b89be6853b21ec78fb",
+      "timestamp": "2026-08-13T11:48:29.400910+00:00",
+      "block_height": 800017,
+      "fee": 0.8218,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TKN8ZhMgqwwezEwDicm6jxzXDRofLy24X8",
+          "value": 9.642087,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TDdDkbCY5Qk89s4eFYZ6aTGXrzAnBFvEHY",
+          "value": 0.976298,
+          "index": 0,
+          "is_change": false
+        },
+        {
+          "address": "TM9Cuq8ho7FAVGxQjr3AcJ9y6haD1feJCT",
+          "value": 8.665789,
+          "index": 1,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0xb0172917a9402b3f0bf7420a3b996b2acb75996461044dbf9ad7a917cf3e181e",
+      "timestamp": "2026-08-14T10:48:29.400910+00:00",
+      "block_height": 800018,
+      "fee": 0.6792,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TM9Cuq8ho7FAVGxQjr3AcJ9y6haD1feJCT",
+          "value": 9.457886,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TKkPEKwbXthQQ7pxsdNhn62ZPJrf1z3xSu",
+          "value": 0.488771,
+          "index": 0,
+          "is_change": false
+        },
+        {
+          "address": "TVJkRFkMwvkKrGb2RRKXNtpH1mhzVP4H45",
+          "value": 8.969115,
+          "index": 1,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0xbb3e71594baf7a47c395b7f5f08cc672d6dcfb1eedda081a17e708bfb98b9fce",
+      "timestamp": "2026-08-15T09:48:29.400910+00:00",
+      "block_height": 800019,
+      "fee": 1.4455,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TVJkRFkMwvkKrGb2RRKXNtpH1mhzVP4H45",
+          "value": 6.869494,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TUmk5HBTNfdwY6xQJ4euWdqFjiwTPJtYB5",
+          "value": 0.595627,
+          "index": 0,
+          "is_change": false
+        },
+        {
+          "address": "TVpd65mFc3UFn5mZhTkhVtrpX2rUvv61PM",
+          "value": 6.273868,
+          "index": 1,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "TRON",
+      "txid": "0x7bdbd3d3d99e32f8d89336e1e46ee57f73e1cd724607e2fed496fc83c6b4c00a",
+      "timestamp": "2026-08-31T12:48:29.400910+00:00",
+      "block_height": 800020,
+      "fee": 0.1552,
+      "asset": "USDT-TRC20",
+      "inputs": [
+        {
+          "address": "TVpd65mFc3UFn5mZhTkhVtrpX2rUvv61PM",
+          "value": 14.791676,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "TRyRpB9pg4aegknQoXD4HpBJZN9xY4zqub",
+          "value": 14.791676,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "ETH",
+      "txid": "0xf3d7e6d5899be9dd230c5a4904a04422706979dac2b8097f720afa0ae459554d",
+      "timestamp": "2026-06-14T22:48:29.400910+00:00",
+      "block_height": 800021,
+      "fee": 1.2631,
+      "asset": "ETH",
+      "inputs": [
+        {
+          "address": "0x0727cFb6595FC40D3e370B6FFe41f3fa4BAc1952",
+          "value": 0.226926,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "0x6922E2F1aCaD668E32fA2422593e38b392B5c23F",
+          "value": 0.226926,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "ETH",
+      "txid": "0xe68db911a802347845072ca7881c4ad8665050c6b43aa98731807d12a69267dc",
+      "timestamp": "2026-08-12T08:48:29.400910+00:00",
+      "block_height": 800022,
+      "fee": 0.7293,
+      "asset": "ETH",
+      "inputs": [
+        {
+          "address": "0x600AC8e42F88B340AdF643B071020be2eF9a5bbd",
+          "value": 1.632486,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "0xFDF1D6f70f3E7E1E763A2659A1aE2716e0083894",
+          "value": 1.632486,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "ETH",
+      "txid": "0xf00b3d43aba681158d2ed45e32bfdc7e2707ef06ff41cf22599a7b53984318bd",
+      "timestamp": "2026-06-14T08:48:29.400910+00:00",
+      "block_height": 800023,
+      "fee": 1.9895,
+      "asset": "ETH",
+      "inputs": [
+        {
+          "address": "0x7D0561d3349A63977b3777aaeF91Eee333c7cBF4",
+          "value": 1.993154,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "0xD03dc43A84D40aBe4a30014Ec1800015f2cEC292",
+          "value": 1.993154,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "ETH",
+      "txid": "0xb856a039ed8191d4f347065a9740a337bedddbac275f56dee78928d53f33981f",
+      "timestamp": "2026-06-06T12:48:29.400910+00:00",
+      "block_height": 800024,
+      "fee": 1.9022,
+      "asset": "ETH",
+      "inputs": [
+        {
+          "address": "0x6922E2F1aCaD668E32fA2422593e38b392B5c23F",
+          "value": 3.581782,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "0x8F372527b722FB79f2076A50EE82647e76bAb494",
+          "value": 3.528055,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "ETH",
+      "txid": "0xd2e0beecfb2ce008380e3a1fcdf99f8fad332f6707ef934cda3f7bf9872b5d36",
+      "timestamp": "2026-06-22T12:48:29.400910+00:00",
+      "block_height": 800025,
+      "fee": 0.7133,
+      "asset": "ETH",
+      "inputs": [
+        {
+          "address": "0xFDF1D6f70f3E7E1E763A2659A1aE2716e0083894",
+          "value": 2.426831,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "0x8F372527b722FB79f2076A50EE82647e76bAb494",
+          "value": 2.390428,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "ETH",
+      "txid": "0x6510f24a8d4d80cfcf4b80f9bcc24a022e45fc96141f0b55f1f9163800ab87a9",
+      "timestamp": "2026-07-30T12:48:29.400910+00:00",
+      "block_height": 800026,
+      "fee": 1.563,
+      "asset": "ETH",
+      "inputs": [
+        {
+          "address": "0xD03dc43A84D40aBe4a30014Ec1800015f2cEC292",
+          "value": 1.247447,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "0x8F372527b722FB79f2076A50EE82647e76bAb494",
+          "value": 1.228736,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "ETH",
+      "txid": "0x89e790ebc3b3ba5b1c0beaa205c1d8030763d73297b7e035fca62b32a0c28a3a",
+      "timestamp": "2026-08-12T12:48:29.400910+00:00",
+      "block_height": 800027,
+      "fee": 0.4088,
+      "asset": "ETH",
+      "inputs": [
+        {
+          "address": "0x8F372527b722FB79f2076A50EE82647e76bAb494",
+          "value": 14.204191,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "0x1ef32BdA96e717f1FaC5E93513dD9E0166e75888",
+          "value": 0.637482,
+          "index": 0,
+          "is_change": false
+        },
+        {
+          "address": "0xCed6f42315Ca54E74Ab722A5d3A918cE64400384",
+          "value": 13.566709,
+          "index": 1,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "ETH",
+      "txid": "0xb0b97a5c39ff1ee768f0d9aca2caabe29cbe6544e96c24c6497d7e5a162aedc4",
+      "timestamp": "2026-08-13T11:48:29.400910+00:00",
+      "block_height": 800028,
+      "fee": 1.8155,
+      "asset": "ETH",
+      "inputs": [
+        {
+          "address": "0xCed6f42315Ca54E74Ab722A5d3A918cE64400384",
+          "value": 18.242325,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "0x300353e2830078D114Bbc9557d1F2e537580A6D6",
+          "value": 0.772199,
+          "index": 0,
+          "is_change": false
+        },
+        {
+          "address": "0x56b5cE67FCD816322D9446932D24106D17f652AF",
+          "value": 17.470127,
+          "index": 1,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "ETH",
+      "txid": "0x9e869f1396d86ee325a969f4f55a03dbbbc57a8153546f63d5df094e9266f500",
+      "timestamp": "2026-08-14T10:48:29.400910+00:00",
+      "block_height": 800029,
+      "fee": 0.596,
+      "asset": "ETH",
+      "inputs": [
+        {
+          "address": "0x56b5cE67FCD816322D9446932D24106D17f652AF",
+          "value": 9.274943,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "0xbF3A0906294DDa409C83b9D2e86e71831EEAff5c",
+          "value": 0.888986,
+          "index": 0,
+          "is_change": false
+        },
+        {
+          "address": "0xC844cCf0152A58068F15363BE753d3c85BB82D33",
+          "value": 8.385957,
+          "index": 1,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "ETH",
+      "txid": "0xd4f0d47f14a4018d85791cce07a815098ff172b595c728b3db9d51a292e188f5",
+      "timestamp": "2026-08-29T12:48:29.400910+00:00",
+      "block_height": 800030,
+      "fee": 1.6574,
+      "asset": "ETH",
+      "inputs": [
+        {
+          "address": "0xC844cCf0152A58068F15363BE753d3c85BB82D33",
+          "value": 13.654239,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "0x06A3a95E2D4c71355813c7F19BfB542F5abCa430",
+          "value": 13.654239,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "ETH",
+      "txid": "0x1710d52d6b32edc009aae9c08e8d7dfed0eb62948ce7de4d2c062e757af99898",
+      "timestamp": "2026-08-29T18:48:29.400910+00:00",
+      "block_height": 800031,
+      "fee": 1.0557,
+      "asset": "ETH",
+      "inputs": [
+        {
+          "address": "0x06A3a95E2D4c71355813c7F19BfB542F5abCa430",
+          "value": 13.244612,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "0x2FE486D61467fB4aBa63dA3F78fAfD46553410f0",
+          "value": 13.244612,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "ETH",
+      "txid": "0x65714ac9a4139635c54d7b927a875fb855d5c5a60fb5e83035172e217a19f359",
+      "timestamp": "2026-08-31T12:48:29.400910+00:00",
+      "block_height": 800032,
+      "fee": 1.2202,
+      "asset": "ETH",
+      "inputs": [
+        {
+          "address": "0x2FE486D61467fB4aBa63dA3F78fAfD46553410f0",
+          "value": 5.286717,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "0xfABd3344eAdefaF3BF1f572D5a51022E917d2C5D",
+          "value": 5.286717,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "BTC",
+      "txid": "1464c561c0e91c634268520d22419132b166cbabc6de9c51e9d2a623216d813d",
+      "timestamp": "2026-03-31T12:48:29.400910+00:00",
+      "block_height": 800033,
+      "fee": 0.7154,
+      "asset": "BTC",
+      "inputs": [
+        {
+          "address": "1PmpyQSg5Uq91XSfXsdebDGtmmzV9DVE6n",
+          "value": 0.154894,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "1BzaS7gqg7mJNhkp8FaHpyNXvGZfgSvM6z",
+          "value": 0.154894,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "BTC",
+      "txid": "90e43f70bcf9d5fb7f940eb2998181365b1eed676a745ef8e21a07836d32cfad",
+      "timestamp": "2026-03-25T12:48:29.400910+00:00",
+      "block_height": 800034,
+      "fee": 0.1264,
+      "asset": "BTC",
+      "inputs": [
+        {
+          "address": "1DxpGtkmusB7esHAb31YxCmKaiTSnfDs3Z",
+          "value": 0.103386,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "1LuBo2N3fwJVMd9JEqXUHDvqZKyZmNeEXZ",
+          "value": 0.103386,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "BTC",
+      "txid": "a73010037d165c5d54350ce800414bff784d59f21cf0cfb8f01eec6352381952",
+      "timestamp": "2026-04-25T12:48:29.400910+00:00",
+      "block_height": 800035,
+      "fee": 1.3088,
+      "asset": "BTC",
+      "inputs": [
+        {
+          "address": "17vh8NzCRKcVydBkjn86qCGUymeRhJxByN",
+          "value": 0.129315,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "1LXbUtSmbUWzYWkc6WLXXtCayKpagPiiHa",
+          "value": 0.129315,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "BTC",
+      "txid": "b13a085699c4e0dedd70a7c70e67dde7a3c2aa618e0d02e2d5383d2dcd4cac54",
+      "timestamp": "2026-07-28T12:48:29.400910+00:00",
+      "block_height": 800036,
+      "fee": 1.9722,
+      "asset": "BTC",
+      "inputs": [
+        {
+          "address": "17aTmcE2iKZ9cykB2bK1zGUTUTG5E4fx3z",
+          "value": 0.157199,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "15mEVm4kiiGWCuQiaYrbTYWKu3toWR8Nef",
+          "value": 0.157199,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "BTC",
+      "txid": "58272616f64f0399b767bc37d7bdb4b994254c75f4f1ca6f12ab2ade347a62c4",
+      "timestamp": "2026-08-18T12:48:29.400910+00:00",
+      "block_height": 800037,
+      "fee": 0.5225,
+      "asset": "BTC",
+      "inputs": [
+        {
+          "address": "1BzaS7gqg7mJNhkp8FaHpyNXvGZfgSvM6z",
+          "value": 0.176194,
+          "index": 0
+        },
+        {
+          "address": "1LuBo2N3fwJVMd9JEqXUHDvqZKyZmNeEXZ",
+          "value": 0.194297,
+          "index": 1
+        }
+      ],
+      "outputs": [
+        {
+          "address": "1ECiWCgVnb9bnTXL68nbtvH1tpa5mhNfqM",
+          "value": 0.369379,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "BTC",
+      "txid": "e926c259a514787571262814d463f9a3bb4abb617b47fc0e3e783ae8c1fc72e4",
+      "timestamp": "2026-08-14T12:48:29.400910+00:00",
+      "block_height": 800038,
+      "fee": 1.5176,
+      "asset": "BTC",
+      "inputs": [
+        {
+          "address": "1LXbUtSmbUWzYWkc6WLXXtCayKpagPiiHa",
+          "value": 0.14614,
+          "index": 0
+        },
+        {
+          "address": "15mEVm4kiiGWCuQiaYrbTYWKu3toWR8Nef",
+          "value": 0.104054,
+          "index": 1
+        }
+      ],
+      "outputs": [
+        {
+          "address": "15LdiYjJfvFhdvQpFX1vrW6iWpxDhK5aX3",
+          "value": 0.249443,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "BTC",
+      "txid": "e60faab207753c99f9ead94949d22348fcb2189584dd0fcdd5c2341c5423aa70",
+      "timestamp": "2026-08-17T12:48:29.400910+00:00",
+      "block_height": 800039,
+      "fee": 1.0004,
+      "asset": "BTC",
+      "inputs": [
+        {
+          "address": "1ECiWCgVnb9bnTXL68nbtvH1tpa5mhNfqM",
+          "value": 0.812302,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "1LueiyySHM64nAfPpYSUUtDPYJ6Hw2VHPg",
+          "value": 0.635,
+          "index": 0,
+          "is_change": false
+        },
+        {
+          "address": "12riCmTL83spxocbiT8SRiZ2ctRHosXUAv",
+          "value": 0.177302,
+          "index": 1,
+          "is_change": true
+        }
+      ]
+    },
+    {
+      "chain": "BTC",
+      "txid": "0f91e7e9bb0295991f846b512c497b5e0b6d1266b8aa2e900733bdf5f8b0020e",
+      "timestamp": "2026-08-21T12:48:29.400910+00:00",
+      "block_height": 800040,
+      "fee": 0.9209,
+      "asset": "BTC",
+      "inputs": [
+        {
+          "address": "12riCmTL83spxocbiT8SRiZ2ctRHosXUAv",
+          "value": 0.582838,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "1HJMZ91R6ya9Sk2q8voqPkEjjdTPMGTtRf",
+          "value": 0.46365,
+          "index": 0,
+          "is_change": false
+        },
+        {
+          "address": "1Sm5zCHDfFuS8UdFhEWwp4JGQzQYSgS4g",
+          "value": 0.119188,
+          "index": 1,
+          "is_change": true
+        }
+      ]
+    },
+    {
+      "chain": "BTC",
+      "txid": "c8f3e458c6a3e37862b9078c9805c221352f2e567bbb4c6762f2ec6e88f61ac1",
+      "timestamp": "2026-08-25T12:48:29.400910+00:00",
+      "block_height": 800041,
+      "fee": 1.5704,
+      "asset": "BTC",
+      "inputs": [
+        {
+          "address": "1Sm5zCHDfFuS8UdFhEWwp4JGQzQYSgS4g",
+          "value": 0.266961,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "1GQnqYSpzcKn7kPvrmLZfBzAjpbnHP1GU4",
+          "value": 0.161708,
+          "index": 0,
+          "is_change": false
+        },
+        {
+          "address": "178YqGngJDntqJLbwgMjZeJ3cyr7eMwyGW",
+          "value": 0.105253,
+          "index": 1,
+          "is_change": true
+        }
+      ]
+    },
+    {
+      "chain": "BTC",
+      "txid": "52c587dcb20c46fdd1d3a70a6972244fc8d2fc50d82aaeae37a2d5b988dd6cf0",
+      "timestamp": "2026-08-29T12:48:29.400910+00:00",
+      "block_height": 800042,
+      "fee": 0.4764,
+      "asset": "BTC",
+      "inputs": [
+        {
+          "address": "178YqGngJDntqJLbwgMjZeJ3cyr7eMwyGW",
+          "value": 0.440698,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "13HMHzQuYT3MvCxzxneQuaT56VazLMpW8P",
+          "value": 0.440698,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    },
+    {
+      "chain": "BTC",
+      "txid": "8295cdabd02856ca9e3e38ac1d05e2261d9650901512aba51cd10c684e88552e",
+      "timestamp": "2026-08-31T12:48:29.400910+00:00",
+      "block_height": 800043,
+      "fee": 1.527,
+      "asset": "BTC",
+      "inputs": [
+        {
+          "address": "178YqGngJDntqJLbwgMjZeJ3cyr7eMwyGW",
+          "value": 0.573843,
+          "index": 0
+        }
+      ],
+      "outputs": [
+        {
+          "address": "3DKUuePihdsV42MeMUEBn2k726CU3vGqjj",
+          "value": 0.573843,
+          "index": 0,
+          "is_change": false
+        }
+      ]
+    }
+  ],
+  "complaints": [
+    {
+      "victim_ref": "SYN-TRON-V001",
+      "address": "TFxXYrP93fNJjoFKa2EaVU8UM3FqabDJ8a",
+      "chain": "TRON",
+      "amount_inr": 508998.27,
+      "reported_at": "2026-07-30T12:48:29.400910+00:00",
+      "narrative": "Victim responded to a task-based earning scheme promoted on a messaging app and was instructed to deposit to the address shown.",
+      "source": "synthetic"
+    },
+    {
+      "victim_ref": "SYN-TRON-V002",
+      "address": "TVJBa9b12oLrmBDbZVqZvNHjU6JGskhJ17",
+      "chain": "TRON",
+      "amount_inr": 808565.73,
+      "reported_at": "2026-05-16T12:48:29.400910+00:00",
+      "narrative": "Caller impersonated a courier company and directed payment to settle a fabricated customs charge.",
+      "source": "synthetic"
+    },
+    {
+      "victim_ref": "SYN-TRON-V003",
+      "address": "TLQZih91RAG6U3cziN4LWPdTQx91npXDnt",
+      "chain": "TRON",
+      "amount_inr": 182429.46,
+      "reported_at": "2026-08-19T12:48:29.400910+00:00",
+      "narrative": "Caller impersonated a courier company and directed payment to settle a fabricated customs charge.",
+      "source": "synthetic"
+    },
+    {
+      "victim_ref": "SYN-TRON-V004",
+      "address": "TDBJYM5cFMLSNvtJtrnkikpsJaZYpdFPEn",
+      "chain": "TRON",
+      "amount_inr": 700447.43,
+      "reported_at": "2026-06-07T12:48:29.400910+00:00",
+      "narrative": "Fake trading dashboard displayed rising balances; support stopped responding once further deposits were declined.",
+      "source": "synthetic"
+    },
+    {
+      "victim_ref": "SYN-TRON-V005",
+      "address": "TE1BAmn8FgeqEDs25YjmGsNco3FZZi1wVT",
+      "chain": "TRON",
+      "amount_inr": 242067.92,
+      "reported_at": "2026-06-12T12:48:29.400910+00:00",
+      "narrative": "Victim responded to a task-based earning scheme promoted on a messaging app and was instructed to deposit to the address shown.",
+      "source": "synthetic"
+    },
+    {
+      "victim_ref": "SYN-TRON-V006",
+      "address": "TDTCu1ztPn8rAEMRZkKGTjKrdikt2Byocb",
+      "chain": "TRON",
+      "amount_inr": 120545.26,
+      "reported_at": "2026-04-19T12:48:29.400910+00:00",
+      "narrative": "Caller impersonated a courier company and directed payment to settle a fabricated customs charge.",
+      "source": "synthetic"
+    },
+    {
+      "victim_ref": "SYN-ETH-V001",
+      "address": "0x6922E2F1aCaD668E32fA2422593e38b392B5c23F",
+      "chain": "ETH",
+      "amount_inr": 56731.58,
+      "reported_at": "2026-06-15T12:48:29.400910+00:00",
+      "narrative": "Caller impersonated a courier company and directed payment to settle a fabricated customs charge.",
+      "source": "synthetic"
+    },
+    {
+      "victim_ref": "SYN-ETH-V002",
+      "address": "0xFDF1D6f70f3E7E1E763A2659A1aE2716e0083894",
+      "chain": "ETH",
+      "amount_inr": 408121.49,
+      "reported_at": "2026-08-12T12:48:29.400910+00:00",
+      "narrative": "Caller impersonated a courier company and directed payment to settle a fabricated customs charge.",
+      "source": "synthetic"
+    },
+    {
+      "victim_ref": "SYN-ETH-V003",
+      "address": "0xD03dc43A84D40aBe4a30014Ec1800015f2cEC292",
+      "chain": "ETH",
+      "amount_inr": 498288.51,
+      "reported_at": "2026-06-14T12:48:29.400910+00:00",
+      "narrative": "Caller impersonated a courier company and directed payment to settle a fabricated customs charge.",
+      "source": "synthetic"
+    },
+    {
+      "victim_ref": "SYN-BTC-V001",
+      "address": "1BzaS7gqg7mJNhkp8FaHpyNXvGZfgSvM6z",
+      "chain": "BTC",
+      "amount_inr": 851917.77,
+      "reported_at": "2026-03-31T12:48:29.400910+00:00",
+      "narrative": "Investment platform promised guaranteed daily returns; withdrawals were blocked after the deposit.",
+      "source": "synthetic"
+    },
+    {
+      "victim_ref": "SYN-BTC-V002",
+      "address": "1LuBo2N3fwJVMd9JEqXUHDvqZKyZmNeEXZ",
+      "chain": "BTC",
+      "amount_inr": 568620.5,
+      "reported_at": "2026-03-25T12:48:29.400910+00:00",
+      "narrative": "Investment platform promised guaranteed daily returns; withdrawals were blocked after the deposit.",
+      "source": "synthetic"
+    },
+    {
+      "victim_ref": "SYN-BTC-V003",
+      "address": "1LXbUtSmbUWzYWkc6WLXXtCayKpagPiiHa",
+      "chain": "BTC",
+      "amount_inr": 711229.87,
+      "reported_at": "2026-04-25T12:48:29.400910+00:00",
+      "narrative": "Caller impersonated a courier company and directed payment to settle a fabricated customs charge.",
+      "source": "synthetic"
+    },
+    {
+      "victim_ref": "SYN-BTC-V004",
+      "address": "15mEVm4kiiGWCuQiaYrbTYWKu3toWR8Nef",
+      "chain": "BTC",
+      "amount_inr": 864596.38,
+      "reported_at": "2026-07-28T12:48:29.400910+00:00",
+      "narrative": "Fake trading dashboard displayed rising balances; support stopped responding once further deposits were declined.",
+      "source": "synthetic"
+    }
+  ],
+  "terminals": {
+    "TRON": {
+      "hot_wallet": "TRyRpB9pg4aegknQoXD4HpBJZN9xY4zqub",
+      "mixer": null
+    },
+    "ETH": {
+      "hot_wallet": "0xfABd3344eAdefaF3BF1f572D5a51022E917d2C5D",
+      "mixer": "0x06A3a95E2D4c71355813c7F19BfB542F5abCa430"
+    },
+    "BTC": {
+      "hot_wallet": "13HMHzQuYT3MvCxzxneQuaT56VazLMpW8P",
+      "deposit_2": "3DKUuePihdsV42MeMUEBn2k726CU3vGqjj"
+    }
+  }
+}

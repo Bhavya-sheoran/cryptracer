@@ -1,0 +1,106 @@
+{
+  "source": "GraphSense TagPacks (public, community-curated)",
+  "fetched_at": "2026-09-01T16:10:58Z",
+  "packs": [
+    {
+      "pack": "walletexplorer.yaml",
+      "bytes": 74692,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/walletexplorer.yaml"
+    },
+    {
+      "pack": "etherscan-wordcloud-exchange.yaml",
+      "bytes": 73867,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/etherscan-wordcloud-exchange.yaml"
+    },
+    {
+      "pack": "exchange-wallets-binance.yaml",
+      "bytes": 9636,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/exchange-wallets-binance.yaml"
+    },
+    {
+      "pack": "exchange-wallets-huobi.yaml",
+      "bytes": 6328,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/exchange-wallets-huobi.yaml"
+    },
+    {
+      "pack": "exchange-wallets-kucoin.yaml",
+      "bytes": 4747,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/exchange-wallets-kucoin.yaml"
+    },
+    {
+      "pack": "exchange-wallets-okx.yaml",
+      "bytes": 2974,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/exchange-wallets-okx.yaml"
+    },
+    {
+      "pack": "exchange-wallets-bybit.yaml",
+      "bytes": 962,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/exchange-wallets-bybit.yaml"
+    },
+    {
+      "pack": "exchange-wallets-cryptocom.yaml",
+      "bytes": 1094,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/exchange-wallets-cryptocom.yaml"
+    },
+    {
+      "pack": "exchange-wallets-bitfinexcom.yaml",
+      "bytes": 15836,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/exchange-wallets-bitfinexcom.yaml"
+    },
+    {
+      "pack": "exchange-wallets-deribit.yaml",
+      "bytes": 1533,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/exchange-wallets-deribit.yaml"
+    },
+    {
+      "pack": "exchange-wallets-swissborg.yaml",
+      "bytes": 1235,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/exchange-wallets-swissborg.yaml"
+    },
+    {
+      "pack": "binance.yaml",
+      "bytes": 495,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/binance.yaml"
+    },
+    {
+      "pack": "etherscan-wordcloud-mixing_service.yaml",
+      "bytes": 6446,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/etherscan-wordcloud-mixing_service.yaml"
+    },
+    {
+      "pack": "tornado_cash.yaml",
+      "bytes": 2533,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/tornado_cash.yaml"
+    },
+    {
+      "pack": "blender_io.yaml",
+      "bytes": 2408,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/blender_io.yaml"
+    },
+    {
+      "pack": "wasabi_collector.yaml",
+      "bytes": 513,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/wasabi_collector.yaml"
+    },
+    {
+      "pack": "sinbad_io.yaml",
+      "bytes": 399,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/sinbad_io.yaml"
+    },
+    {
+      "pack": "ofac.yaml",
+      "bytes": 37850,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/ofac.yaml"
+    },
+    {
+      "pack": "etherscan-wordcloud-gambling.yaml",
+      "bytes": 12292,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/etherscan-wordcloud-gambling.yaml"
+    },
+    {
+      "pack": "etherscan-wordcloud-market.yaml",
+      "bytes": 24022,
+      "url": "https://raw.githubusercontent.com/graphsense/graphsense-tagpacks/master/packs/etherscan-wordcloud-market.yaml"
+    }
+  ]
+}

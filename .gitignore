@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+
+# Environment / secrets
+.env
+.env.local
+*.pem
+
+# Datasets (large / redistribution-restricted) - fetched by ml/src/download_data.py
+ml/data/*
+!ml/data/.gitkeep
+
+# Runtime artifacts
+backend/storage/
+*.db
+*.sqlite3
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local screenshots from headless verification runs
+.shots/
+
+# Scratch files from manual API verification
+.inv
+.sup
+.case
+.fr
+.str
+.exhibit.txt
+.report.pdf
+.tron_addr

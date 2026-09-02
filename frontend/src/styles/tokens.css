@@ -1,0 +1,201 @@
+/* ==========================================================================
+   Design tokens
+   --------------------------------------------------------------------------
+   One source of truth for colour, type, space and elevation. Components never
+   hardcode a hex value; they reference a token. That is what keeps a hundred
+   small decisions consistent instead of drifting.
+
+   Light is the default. Block explorers and compliance tools (Etherscan,
+   MetaSleuth, TRM) default to light because investigators screenshot findings
+   into reports and briefs, where a dark screenshot reads badly. Dark is
+   available for long sessions and is a first-class theme, not an afterthought.
+   ========================================================================== */
+
+:root {
+  /* --- neutral ramp ----------------------------------------------------- */
+  --n-0:  #ffffff;
+  --n-25: #fcfcfd;
+  --n-50: #f7f8fa;
+  --n-100:#eef0f4;
+  --n-200:#e2e5eb;
+  --n-300:#cdd2db;
+  --n-400:#9aa3b2;
+  --n-500:#6b7480;
+  --n-600:#4d5560;
+  --n-700:#363c45;
+  --n-800:#23272e;
+  --n-900:#14171c;
+  --n-950:#0c0e12;
+
+  /* --- brand / accent --------------------------------------------------- */
+  --brand-50:  #eef4ff;
+  --brand-100: #dbe7ff;
+  --brand-300: #8fb4ff;
+  --brand-500: #2f6bdd;
+  --brand-600: #2456bb;
+  --brand-700: #1c4494;
+
+  /* --- semantic: risk + status ------------------------------------------
+     These carry meaning, not decoration. Green is never "success" here - it
+     means low risk or an attributed service. */
+  --ok-50:   #e9f7ef;
+  --ok-200:  #a8dfc0;
+  --ok-500:  #1a8a52;
+  --ok-700:  #126b3f;
+
+  --warn-50: #fff6e5;
+  --warn-200:#f5d99b;
+  --warn-500:#b57611;
+  --warn-700:#8a5a0c;
+
+  --dang-50: #fdecec;
+  --dang-200:#f3b6b6;
+  --dang-500:#c0392b;
+  --dang-700:#94291f;
+
+  --info-50: #eaf3fb;
+  --info-200:#a9cdea;
+  --info-500:#2b7bbd;
+
+  /* Mixer / layering signal - distinct from danger so an investigator does
+     not read "mixer contact" as "sanctioned". */
+  --mix-50:  #fdf0e6;
+  --mix-200: #f1c69c;
+  --mix-500: #c2670d;
+
+  /* --- applied surfaces -------------------------------------------------- */
+  --bg:          var(--n-50);
+  --bg-elevated: var(--n-0);
+  --bg-sunken:   var(--n-100);
+  --bg-inset:    var(--n-25);
+  --surface-nav: var(--n-0);
+  --surface-rail:var(--n-0);
+
+  --border:        var(--n-200);
+  --border-strong: var(--n-300);
+  --border-subtle: var(--n-100);
+
+  --text:        var(--n-900);
+  --text-muted:  var(--n-500);
+  --text-subtle: var(--n-400);
+  --text-invert: var(--n-0);
+
+  --accent:       var(--brand-500);
+  --accent-hover: var(--brand-600);
+  --accent-soft:  var(--brand-50);
+  --focus-ring:   color-mix(in srgb, var(--brand-500) 45%, transparent);
+
+  /* --- typography --------------------------------------------------------
+     System stacks only. No webfont: the dashboard must render identically
+     offline and on an air-gapped demo machine. */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas,
+               "Liberation Mono", monospace;
+
+  --fs-xs:  11.5px;
+  --fs-sm:  12.5px;
+  --fs-md:  13.5px;
+  --fs-base:14.5px;
+  --fs-lg:  16px;
+  --fs-xl:  19px;
+  --fs-2xl: 24px;
+  --fs-3xl: 30px;
+
+  --lh-tight: 1.25;
+  --lh-base:  1.55;
+
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semi:   600;
+  --fw-bold:   700;
+
+  /* --- space scale (4px base) ------------------------------------------- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* --- radii + elevation ------------------------------------------------- */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-full: 999px;
+
+  --shadow-xs: 0 1px 2px rgba(16, 22, 30, 0.05);
+  --shadow-sm: 0 1px 3px rgba(16, 22, 30, 0.08), 0 1px 2px rgba(16, 22, 30, 0.04);
+  --shadow-md: 0 4px 12px rgba(16, 22, 30, 0.10), 0 1px 3px rgba(16, 22, 30, 0.06);
+  --shadow-lg: 0 12px 32px rgba(16, 22, 30, 0.14);
+
+  /* --- layout ------------------------------------------------------------ */
+  --rail-w: 212px;
+  --nav-h: 56px;
+  --content-max: 1400px;
+
+  --transition: 120ms cubic-bezier(0.2, 0, 0.2, 1);
+
+  color-scheme: light;
+}
+
+/* ==========================================================================
+   Dark theme
+   Only the applied tokens are redefined - the ramps stay put, so a component
+   written against --bg / --text needs no dark-specific rule.
+   ========================================================================== */
+:root[data-theme="dark"] {
+  --bg:          var(--n-950);
+  --bg-elevated: #15181e;
+  --bg-sunken:   #101318;
+  --bg-inset:    #0e1116;
+  --surface-nav: #15181e;
+  --surface-rail:#12151a;
+
+  --border:        #262b33;
+  --border-strong: #343a44;
+  --border-subtle: #1c2027;
+
+  --text:        #e8ebf0;
+  --text-muted:  #98a1af;
+  --text-subtle: #6e7684;
+  --text-invert: var(--n-950);
+
+  --accent:       #5b93f5;
+  --accent-hover: #77a6f8;
+  --accent-soft:  #172445;
+  --focus-ring:   color-mix(in srgb, #5b93f5 45%, transparent);
+
+  --ok-50:   #10251b;
+  --ok-200:  #1f6b40;
+  --ok-500:  #4cc38a;
+  --ok-700:  #7edcae;
+
+  --warn-50: #241d10;
+  --warn-200:#6b5116;
+  --warn-500:#e0a92a;
+  --warn-700:#f5cd70;
+
+  --dang-50: #2a1414;
+  --dang-200:#6b302b;
+  --dang-500:#f0736a;
+  --dang-700:#ff9d95;
+
+  --info-50: #12222e;
+  --info-200:#255273;
+  --info-500:#5fb0e8;
+
+  --mix-50:  #2a1c0d;
+  --mix-200: #6b481c;
+  --mix-500: #e3963c;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
+}

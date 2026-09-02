@@ -1,0 +1,92 @@
+{
+  "model_version": "elliptic-xgb-v1",
+  "algorithm": "xgboost.train (native Booster API)",
+  "xgboost_version": "2.1.4",
+  "dataset": "Elliptic Bitcoin Dataset (public; Elliptic++ mirror)",
+  "validation_protocol": "temporal split - train on Time step <= 34, test on Time step > 34. No random shuffling: transactions within a time step are correlated, so a random split would leak future information and inflate these numbers.",
+  "rows_total": 46564,
+  "features": 182,
+  "train_rows": 29894,
+  "train_illicit": 3462,
+  "test_rows": 16670,
+  "test_illicit": 1083,
+  "scale_pos_weight": 7.635,
+  "num_boost_round": 400,
+  "train_seconds": 4.9,
+  "metrics_heldout": {
+    "precision_illicit": 0.8824,
+    "recall_illicit": 0.7341,
+    "f1_illicit": 0.8014,
+    "roc_auc": 0.9299,
+    "average_precision": 0.8048
+  },
+  "confusion_matrix_heldout": {
+    "true_negative": 15481,
+    "false_positive": 106,
+    "false_negative": 288,
+    "true_positive": 795
+  },
+  "top_features": [
+    {
+      "feature": "size",
+      "gain": 659.4684
+    },
+    {
+      "feature": "Local_feature_46",
+      "gain": 357.8465
+    },
+    {
+      "feature": "Local_feature_53",
+      "gain": 262.8181
+    },
+    {
+      "feature": "Local_feature_59",
+      "gain": 159.0216
+    },
+    {
+      "feature": "Aggregate_feature_7",
+      "gain": 90.8392
+    },
+    {
+      "feature": "Aggregate_feature_68",
+      "gain": 87.4254
+    },
+    {
+      "feature": "Local_feature_65",
+      "gain": 85.0873
+    },
+    {
+      "feature": "Local_feature_49",
+      "gain": 82.7122
+    },
+    {
+      "feature": "Aggregate_feature_70",
+      "gain": 82.7101
+    },
+    {
+      "feature": "Local_feature_23",
+      "gain": 79.6327
+    },
+    {
+      "feature": "Local_feature_29",
+      "gain": 66.2316
+    },
+    {
+      "feature": "Local_feature_5",
+      "gain": 65.0686
+    },
+    {
+      "feature": "Local_feature_47",
+      "gain": 58.5895
+    },
+    {
+      "feature": "Local_feature_37",
+      "gain": 53.2766
+    },
+    {
+      "feature": "Aggregate_feature_10",
+      "gain": 51.8234
+    }
+  ],
+  "model_path": "ml/artifacts/fraud_clf.json"
+}

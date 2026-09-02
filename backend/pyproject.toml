@@ -1,0 +1,53 @@
+[project]
+name = "sih183-backend"
+version = "0.1.0"
+description = "SIH26183 - fraud-linked exchange identification from victim-reported wallets"
+requires-python = ">=3.11"
+
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "sqlalchemy>=2.0.36",
+    "psycopg[binary]>=3.2",
+    "alembic>=1.14",
+    "neo4j>=5.26",
+    "redis>=5.2",
+    "httpx>=0.28",
+    "python-jose[cryptography]>=3.3",
+    "bcrypt>=4.1",
+    "python-multipart>=0.0.17",
+    "base58>=2.1.1",
+    "pycryptodome>=3.21",
+    "PyYAML>=6.0",
+    "numpy>=2.1",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+    "xgboost-cpu>=2.1",  # no CUDA payload; see requirements.txt
+    "fpdf2>=2.8",
+    "joblib>=1.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# B008 flags function calls in default arguments. Depends(get_db) is the
+# documented FastAPI dependency-injection idiom, so it is excluded rather than
+# worked around.
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["app/tests"]
+addopts = "-q"
+asyncio_mode = "auto"
