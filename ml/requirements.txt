@@ -1,0 +1,13 @@
+# Training-only dependencies.
+#
+# Deliberately NOT in backend/requirements.txt: PyTorch is ~1 GB installed and
+# the API never trains, it only loads a saved model. Keeping it here means the
+# service image stays at ~1.5 GB instead of ~2.5 GB, and the API's dependency
+# surface stays small.
+#
+# CPU wheels only - see ml/Dockerfile for the index URL. No CUDA on this project.
+numpy>=2.1
+pandas>=2.2
+scikit-learn>=1.5
+torch>=2.4
+torch-geometric>=2.6

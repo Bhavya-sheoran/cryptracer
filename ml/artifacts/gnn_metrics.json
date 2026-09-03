@@ -1,0 +1,58 @@
+{
+  "model_version": "elliptic-graphsage-v1",
+  "algorithm": "GraphSAGE (2-layer), PyTorch Geometric",
+  "torch_version": "2.14.0+cpu",
+  "dataset": "Elliptic Bitcoin Dataset (public; Elliptic++ mirror)",
+  "validation_protocol": "temporal split - train on Time step < 30, validate on 30..34, test on > 34. Message passing sees the whole graph (transductive, standard for this benchmark) but the loss is computed only on training nodes and no test label is read during training. Early stopping uses the validation slice, never the test tail.",
+  "nodes": 203769,
+  "nodes_labelled": 46564,
+  "nodes_unlabelled_used_for_structure": 157205,
+  "edges_undirected": 234355,
+  "edges_dropped_out_of_dataset": 0,
+  "features": 182,
+  "feature_standardisation": "z-score fitted on training nodes only, clipped to +/-10",
+  "train_nodes": 26381,
+  "val_nodes": 3513,
+  "test_nodes": 16670,
+  "test_illicit": 1083,
+  "epochs_run": 124,
+  "best_epoch": 99,
+  "best_val_f1": 0.8797,
+  "train_seconds": 298.4,
+  "metrics_heldout": {
+    "precision_illicit": 0.5672,
+    "recall_illicit": 0.6076,
+    "f1_illicit": 0.5867,
+    "roc_auc": 0.89,
+    "average_precision": 0.5786
+  },
+  "confusion_matrix_heldout": {
+    "true_negative": 15085,
+    "false_positive": 502,
+    "false_negative": 425,
+    "true_positive": 658
+  },
+  "baseline_comparison": {
+    "baseline_model": "elliptic-xgb-v1",
+    "baseline": {
+      "precision_illicit": 0.8824,
+      "recall_illicit": 0.7341,
+      "f1_illicit": 0.8014,
+      "roc_auc": 0.9299,
+      "average_precision": 0.8048
+    },
+    "delta": {
+      "precision_illicit": -0.3152,
+      "recall_illicit": -0.1265,
+      "f1_illicit": -0.2147,
+      "roc_auc": -0.0399,
+      "average_precision": -0.2262
+    }
+  },
+  "conclusion": {
+    "gnn_beats_tabular_baseline": false,
+    "shipped_model": "XGBoost (ml/artifacts/fraud_clf.json)",
+    "note": "The GNN does NOT beat the gradient-boosted baseline on this dataset, and it is not wired into the API. This matches the published finding for Elliptic (Weber et al. 2019), where Random Forest outperformed a GCN on illicit recall (0.67 vs 0.51); this GraphSAGE sits between the two. Elliptic's 166 node features already encode aggregated neighbourhood statistics, so much of what message passing would contribute is present in the features, and the post-step-43 distribution shift hurts the graph model harder. Kept as a documented, reproducible experiment rather than a claimed improvement."
+  },
+  "model_path": "ml/artifacts/gnn_model.pt"
+}

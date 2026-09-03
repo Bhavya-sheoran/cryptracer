@@ -93,6 +93,8 @@ victim report ──▶ FastAPI intake ──▶ chain detect ──▶ blockcha
 | Auth | Simplified JWT with role claims |
 | Infra | Docker Compose |
 
+Architecture and design rationale: **[docs/architecture.md](docs/architecture.md)**.
+Live demo click-path: **[docs/demo-script.md](docs/demo-script.md)**.
 Full data model: **[docs/schema.md](docs/schema.md)**.
 API contracts: **[docs/api.md](docs/api.md)**.
 
@@ -353,6 +355,54 @@ deliberately exposes. Reproduce with:
 ```bash
 docker compose exec backend python ml/src/train_fraud_clf.py
 ```
+
+### Stretch goal: a GNN, and an honest negative result
+
+Your brief listed a PyTorch Geometric GNN as a stretch goal once the MVP was
+done. It is built, reproducible, and **it does not beat the baseline** — which
+is the result, not a failure to report.
+
+2-layer GraphSAGE over the full 203,769-node / 234,355-edge Elliptic graph,
+same temporal split and same metrics as the XGBoost baseline:
+
+| Metric (illicit, held out) | XGBoost | GraphSAGE | Δ |
+|---|---:|---:|---:|
+| Precision | **0.8824** | 0.5672 | −0.3152 |
+| Recall | **0.7341** | 0.6076 | −0.1265 |
+| F1 | **0.8014** | 0.5867 | −0.2147 |
+| ROC-AUC | **0.9299** | 0.8900 | −0.0399 |
+
+This matches the published finding for Elliptic: in Weber et al. (2019) Random
+Forest outperformed a GCN on illicit recall (0.67 vs 0.51); this GraphSAGE sits
+between the two. Elliptic's node features already encode aggregated
+neighbourhood statistics, so much of what message passing would add is present
+in the features, and the post-step-43 distribution shift hurts the graph model
+harder.
+
+**XGBoost remains the shipped model. The GNN is not wired into the API.**
+
+Two real bugs surfaced getting here, both worth recording:
+
+1. **A gutted graph.** Building it from labelled nodes only discarded 197,731 of
+   234,355 edges — Elliptic's labelled transactions connect to each other
+   *through* unlabelled ones. Fixed by including all 203,769 nodes for message
+   passing while keeping loss and metrics on labelled nodes only.
+2. **Unnormalised features.** The matrix spans −13 to 445,268 with σ≈300. Trees
+   are scale-invariant so the baseline never cared; the GNN's first-epoch loss
+   was 35 (cross-entropy should start near 0.69) and it collapsed to predicting
+   one class. Z-scoring — fitted on **training nodes only**, to avoid leaking
+   the held-out tail — moved F1 from 0.137 to 0.587 and ROC-AUC from 0.576 to
+   0.890.
+
+```bash
+docker compose exec backend python ml/src/download_data.py elliptic-full   # ~67 min
+docker compose exec backend python ml/src/download_data.py edgelist
+docker compose --profile ml run --rm ml python ml/src/train_gnn.py
+```
+
+PyTorch lives in a **separate `ml/` image** (1.9 GB) behind a compose profile,
+so the API image stays at 1.46 GB and the service never ships a training stack
+it cannot use.
 
 **What this model is not.** It scores how illicit a *Bitcoin transaction* looks.
 It is not the exchange fraud-linkage score - Elliptic labels transactions, not

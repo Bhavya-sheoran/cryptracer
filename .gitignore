@@ -45,3 +45,6 @@ Thumbs.db
 .exhibit.txt
 .report.pdf
 .tron_addr
+
+# Trained GNN weights (regenerate with ml/src/train_gnn.py)
+ml/artifacts/gnn_model.pt

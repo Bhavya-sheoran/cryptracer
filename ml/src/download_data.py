@@ -154,6 +154,102 @@ def fetch_elliptic(out_dir: Path = DATA_DIR) -> dict:
     return meta
 
 
+def fetch_elliptic_full(out_dir: Path = DATA_DIR) -> dict:
+    """Stream the FULL feature matrix - every transaction, labelled or not.
+
+    `fetch_elliptic` keeps only the ~46k labelled rows, which is all a tabular
+    model needs. A graph model needs more: Elliptic's labelled transactions are
+    largely connected to each other *through* unlabelled ones, so training on
+    the labelled-only subgraph discards ~84% of the edges and destroys the
+    structure the model exists to exploit.
+
+    Still streamed and re-compressed rather than saved raw, so the 695 MB source
+    never lands on disk. Labels are carried as 1 illicit / 2 licit / -1 unknown.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    print("[elliptic-full] fetching class labels ...", flush=True)
+    with _open(ELLIPTIC_BASE + urllib.parse.quote(ELLIPTIC_CLASSES)) as r:
+        text = r.read().decode("utf-8")
+    labels: dict[str, str] = {}
+    for row in csv.DictReader(io.StringIO(text)):
+        cls = row["class"].strip()
+        if cls in (LABEL_ILLICIT, LABEL_LICIT):
+            labels[row["txId"].strip()] = cls
+
+    out_path = out_dir / "elliptic_all.csv.gz"
+    print(f"[elliptic-full] streaming every row -> {out_path}", flush=True)
+
+    started = time.time()
+    seen = labelled = 0
+    url = ELLIPTIC_BASE + urllib.parse.quote(ELLIPTIC_FEATURES)
+
+    with _open(url, timeout=900) as resp, gzip.open(out_path, "wt", newline="") as gz:
+        stream = io.TextIOWrapper(resp, encoding="utf-8", newline="")
+        reader = csv.reader(stream)
+        writer = csv.writer(gz)
+        header = next(reader)
+        writer.writerow(header + ["label"])
+        for row in reader:
+            seen += 1
+            label = labels.get(row[0].strip(), "-1")
+            if label != "-1":
+                labelled += 1
+            writer.writerow(row + [label])
+            if seen % 50_000 == 0:
+                print(f"[elliptic-full]   {seen} rows ({time.time() - started:.0f}s)", flush=True)
+
+    meta = {
+        "source": "Elliptic++ mirror of the Elliptic Bitcoin Dataset (public)",
+        "rows": seen,
+        "labelled": labelled,
+        "unlabelled": seen - labelled,
+        "feature_columns": len(header) - 2,
+        "elapsed_seconds": round(time.time() - started, 1),
+        "output": str(out_path),
+        "output_bytes": out_path.stat().st_size,
+    }
+    (out_dir / "elliptic_all_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    print(f"[elliptic-full] done: {seen} rows ({labelled} labelled) in "
+          f"{meta['output_bytes'] / 1e6:.1f} MB ({meta['elapsed_seconds']}s)", flush=True)
+    return meta
+
+
+def fetch_edgelist(out_dir: Path = DATA_DIR) -> dict:
+    """Fetch the Elliptic transaction graph edges.
+
+    The feature matrix alone treats each transaction independently. The edge
+    list is what makes a *graph* model possible - it is how a transaction's
+    neighbourhood becomes evidence about the transaction itself, which is the
+    whole premise of the GNN stretch goal.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "elliptic_edgelist.csv"
+    url = ELLIPTIC_BASE + urllib.parse.quote(ELLIPTIC_EDGES)
+
+    print(f"[edgelist] fetching {ELLIPTIC_EDGES} ...", flush=True)
+    started = time.time()
+    with _open(url, timeout=300) as resp:
+        payload = resp.read()
+    out_path.write_bytes(payload)
+
+    edges = max(payload.count(bytes([10])) - 1, 0)  # newline count = rows, minus header
+    meta = {
+        "source": "Elliptic++ mirror of the Elliptic Bitcoin Dataset (public)",
+        "source_url": url,
+        "edges": edges,
+        "bytes": len(payload),
+        "elapsed_seconds": round(time.time() - started, 1),
+        "output": str(out_path),
+    }
+    (out_dir / "elliptic_edgelist_meta.json").write_text(
+        json.dumps(meta, indent=2), encoding="utf-8"
+    )
+    print(f"[edgelist] {edges} edges, {len(payload) / 1e6:.2f} MB "
+          f"({meta['elapsed_seconds']}s)", flush=True)
+    return meta
+
+
 # ---------------------------------------------------------------------------
 # OFAC SDN - sanctioned digital currency addresses
 # ---------------------------------------------------------------------------
@@ -253,13 +349,20 @@ def fetch_tagpacks(out_dir: Path = SEED_DIR) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("target", choices=["elliptic", "ofac", "tagpacks", "all"])
+    ap.add_argument(
+        "target",
+        choices=["elliptic", "elliptic-full", "edgelist", "ofac", "tagpacks", "all"],
+    )
     ap.add_argument("--data-dir", type=Path, default=DATA_DIR)
     ap.add_argument("--seed-dir", type=Path, default=SEED_DIR)
     args = ap.parse_args()
 
     if args.target in ("elliptic", "all"):
         fetch_elliptic(args.data_dir)
+    if args.target in ("elliptic-full",):
+        fetch_elliptic_full(args.data_dir)
+    if args.target in ("edgelist", "all"):
+        fetch_edgelist(args.data_dir)
     if args.target in ("ofac", "all"):
         fetch_ofac(args.seed_dir)
     if args.target in ("tagpacks", "all"):

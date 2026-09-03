@@ -135,6 +135,21 @@ services:
       - backend
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
 
+  # Training-only image. Behind a profile so `docker compose up` never starts it:
+  # it exists to be `run`, and it carries PyTorch (~1.9 GB) which the API must
+  # not. Bring it up explicitly:
+  #   docker compose run --rm ml python ml/src/train_gnn.py
+  ml:
+    profiles: ["ml"]
+    build:
+      context: ./ml
+    container_name: sih183-ml
+    working_dir: /repo
+    volumes:
+      - ./ml:/repo/ml
+      - ./scripts:/repo/scripts:ro
+    command: ["python", "ml/src/train_gnn.py"]
+
 volumes:
   pgdata:
   neo4jdata:
