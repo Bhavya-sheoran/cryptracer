@@ -418,3 +418,96 @@
 
 .theme-toggle { margin-left: auto; }
 .hash { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-muted); }
+
+/* ==========================================================================
+   Service exposure
+   ========================================================================== */
+.exposure-hero {
+  border: 1px solid var(--dang-200);
+  border-left: 4px solid var(--dang-500);
+  background: var(--dang-50);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5);
+  display: flex; flex-direction: column; gap: var(--sp-3);
+}
+.exposure-name {
+  font-size: var(--fs-2xl);
+  letter-spacing: -.015em;
+  margin: 0;
+}
+.exposure-hero .kv dt { color: var(--dang-700); opacity: .8; }
+
+.candidates { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+.candidate {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+.candidate.is-top { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft); }
+
+.candidate-head {
+  width: 100%;
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  background: none; border: 0; cursor: pointer;
+  font: inherit; text-align: left; color: inherit;
+}
+.candidate-head:hover { background: var(--bg-inset); }
+
+.candidate-rank {
+  flex: none;
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border-radius: var(--r-full);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+  font-size: var(--fs-xs); font-weight: var(--fw-semi);
+}
+.candidate.is-top .candidate-rank { background: var(--accent); color: #fff; }
+
+.candidate-score {
+  flex: none;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semi);
+  font-variant-numeric: tabular-nums;
+}
+.candidate-caret { flex: none; color: var(--text-subtle); font-size: 11px; padding-top: 4px; }
+
+.candidate-body {
+  padding: var(--sp-4);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-inset);
+}
+
+/* --- contribution bars --- */
+.factors { display: flex; flex-direction: column; gap: var(--sp-1); }
+.factor {
+  display: grid;
+  grid-template-columns: 86px 1fr 62px 108px;
+  gap: var(--sp-2);
+  align-items: center;
+  font-size: var(--fs-sm);
+}
+.factor-name { color: var(--text-muted); }
+.factor-track { background: var(--bg-sunken); border-radius: var(--r-full); height: 8px; overflow: hidden; }
+.factor-fill { display: block; height: 100%; background: var(--accent); border-radius: var(--r-full); }
+.factor-value { text-align: right; font-variant-numeric: tabular-nums; }
+.factor-raw { text-align: right; }
+
+/* --- route --- */
+/* The factor bars form a dense block; the next heading needs air or it reads as
+   another row of the table. */
+.candidate-body h4 + .route,
+.candidate-body .factors + h4 { margin-top: var(--sp-4); }
+.route { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-top: var(--sp-2); }
+.route-step { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.route-arrow { color: var(--text-subtle); }
+
+.warn-text { color: var(--warn-500); }
+
+@media (max-width: 640px) {
+  .factor { grid-template-columns: 74px 1fr 56px; }
+  .factor-raw { display: none; }
+}

@@ -39,13 +39,20 @@ import argparse
 import hashlib
 import json
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import base58
 from Crypto.Hash import keccak
 
 DEFAULT_OUT = Path(__file__).resolve().parents[1] / "ml" / "seeds" / "synthetic_dataset.json"
+
+# Real contract addresses for the tokens the ring moves. The transactions are
+# fictional; the token identities are genuine, so the pipeline exercises real
+# contract handling rather than a placeholder string. USDT-TRC20 is the
+# dominant rail in reported Indian crypto fraud.
+USDT_TRC20_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
+USDT_ERC20_CONTRACT = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
 DEFAULT_SEED = 26183
 
 NOTICE = (
@@ -101,12 +108,28 @@ class RingBuilder:
 
     def __init__(self, seed: int, now: datetime):
         self.rng = random.Random(seed)
+        # Separate stream for timing jitter. Drawing it from `self.rng` would
+        # consume draws from the same sequence that generates addresses, so any
+        # change to the timing logic would silently change every address in the
+        # dataset - and every hardcoded address in a demo script or doc.
+        self.time_rng = random.Random(seed + 1)
         self.seed = seed
         self.now = now
         self.transactions: list[dict] = []
         self.complaints: list[dict] = []
         self.entities: list[dict] = []
         self._seq = 0
+        # Last time each address was seen receiving funds. Used to force every
+        # transaction to occur after the funds it spends actually arrived -
+        # otherwise a randomly-dated consolidation can precede the hop it feeds,
+        # producing a route that runs backwards in time. Real money cannot do
+        # that, and the exposure engine's continuity check correctly flags it.
+        self._addr_time: dict[str, datetime] = {}
+        # Running balance per address, so value flows THROUGH the ring instead
+        # of each hop inventing an amount. Without this the on-chain figures
+        # contradict the complaints - victims report lakhs while the mule layer
+        # moves a few units - which absolute fiat valuation exposes immediately.
+        self._balance: dict[str, float] = {}
 
     # -- helpers ---------------------------------------------------------
     def _next_txid(self, chain: str) -> str:
@@ -120,8 +143,29 @@ class RingBuilder:
         outputs: list[tuple[str, float, bool]],
         ts: datetime,
         asset: str,
+        token_contract: str | None = None,
+        token_decimals: int = 6,
     ) -> str:
         txid = self._next_txid(chain)
+
+        # Clamp: a spend cannot precede the arrival of what it spends.
+        arrivals = [self._addr_time[a] for a, _ in inputs if a in self._addr_time]
+        if arrivals:
+            earliest = max(arrivals) + timedelta(minutes=self.time_rng.randint(3, 240))
+            if ts < earliest:
+                ts = earliest
+        for addr, value, _ in outputs:
+            self._balance[addr] = self._balance.get(addr, 0.0) + value
+        for addr, value in inputs:
+            self._balance[addr] = max(self._balance.get(addr, 0.0) - value, 0.0)
+
+        for addr, _, _ in outputs:
+            # Keep the LATEST arrival. Overwriting with an earlier one would let
+            # a later spend be dated before funds actually arrived, which is the
+            # very inconsistency this clamp exists to prevent.
+            prior = self._addr_time.get(addr)
+            self._addr_time[addr] = ts if prior is None or ts > prior else prior
+
         self.transactions.append(
             {
                 "chain": chain,
@@ -130,6 +174,10 @@ class RingBuilder:
                 "block_height": 800_000 + self._seq,
                 "fee": round(self.rng.uniform(0.1, 2.0), 4),
                 "asset": asset,
+                # None => the chain's native currency.
+                "token_contract": token_contract,
+                "token_decimals": token_decimals,
+                "status": "success",
                 "inputs": [
                     {"address": a, "value": round(v, 6), "index": i}
                     for i, (a, v) in enumerate(inputs)
@@ -154,8 +202,8 @@ class RingBuilder:
                 "reported_at": (self.now - timedelta(days=days_ago)).isoformat(),
                 "narrative": self.rng.choice(
                     [
-                        "Victim responded to a task-based earning scheme promoted on a messaging app "
-                        "and was instructed to deposit to the address shown.",
+                        "Victim responded to a task-based earning scheme promoted on a "
+                        "messaging app and was instructed to deposit to the address shown.",
                         "Investment platform promised guaranteed daily returns; withdrawals were "
                         "blocked after the deposit.",
                         "Caller impersonated a courier company and directed payment to settle a "
@@ -168,11 +216,16 @@ class RingBuilder:
             }
         )
 
+    def held(self, address: str) -> float:
+        """What this address currently holds, per the ring built so far."""
+        return self._balance.get(address, 0.0)
+
     # -- ring construction ------------------------------------------------
     def build_account_ring(
         self,
         chain: str,
         asset: str,
+        token_contract: str | None,
         exchange_name: str,
         exchange_jurisdiction: str,
         victim_count: int,
@@ -220,7 +273,8 @@ class RingBuilder:
             amount_inr = rng.uniform(45_000, 900_000)
             amount_coin = amount_inr / (250_000 if chain == "ETH" else 85)
 
-            self.add_tx(chain, [(victim_wallet, amount_coin)], [(collector, amount_coin, False)], ts, asset)
+            self.add_tx(chain, [(victim_wallet, amount_coin)], [(collector, amount_coin, False)],
+                        ts, asset, token_contract)
             self.add_complaint(
                 f"SYN-{chain}-V{v + 1:03d}", collector, chain, amount_inr, days_ago
             )
@@ -232,8 +286,13 @@ class RingBuilder:
             for i, src in enumerate(layer):
                 dst = mules[i % len(mules)]
                 ts = self.now - timedelta(days=rng.randint(1, 140), hours=depth)
-                value = rng.uniform(0.4, 9.0)
-                self.add_tx(chain, [(src, value)], [(dst, value * 0.985, False)], ts, asset)
+                value = self.held(src)
+                if value <= 0:
+                    continue
+                # A mule keeps a small cut and forwards the rest.
+                forwarded = value * rng.uniform(0.96, 0.99)
+                self.add_tx(chain, [(src, value)], [(dst, forwarded, False)], ts, asset,
+                            token_contract)
             layer = mules
 
         # Peel chain: repeatedly shave a small amount off and forward the rest.
@@ -242,17 +301,21 @@ class RingBuilder:
             nxt = gen_address(rng, chain)
             side = gen_address(rng, chain)
             ts = self.now - timedelta(days=max(1, 20 - hop), hours=hop)
-            total = rng.uniform(6.0, 20.0)
+            total = self.held(current)
+            if total <= 0:
+                break
             peel = total * rng.uniform(0.04, 0.11)
             self.add_tx(
-                chain, [(current, total)], [(side, peel, False), (nxt, total - peel, False)], ts, asset
+                chain, [(current, total)], [(side, peel, False), (nxt, total - peel, False)],
+                ts, asset, token_contract
             )
             current = nxt
 
         if mixer_address:
             ts = self.now - timedelta(days=3)
-            amt = rng.uniform(5.0, 15.0)
-            self.add_tx(chain, [(current, amt)], [(mixer_address, amt, False)], ts, asset)
+            amt = self.held(current)
+            self.add_tx(chain, [(current, amt)], [(mixer_address, amt, False)], ts, asset,
+                        token_contract)
             post_mix = gen_address(rng, chain)
             self.add_tx(
                 chain,
@@ -260,13 +323,15 @@ class RingBuilder:
                 [(post_mix, amt * 0.97, False)],
                 ts + timedelta(hours=6),
                 asset,
+                token_contract,
             )
             current = post_mix
 
         # Terminal deposit into the exchange hot wallet.
         ts = self.now - timedelta(days=1)
-        final = rng.uniform(5.0, 18.0)
-        self.add_tx(chain, [(current, final)], [(hot_wallet, final, False)], ts, asset)
+        final = self.held(current)
+        self.add_tx(chain, [(current, final)], [(hot_wallet, final, False)], ts, asset,
+                    token_contract)
 
         self.entities.append(entity)
         return {"hot_wallet": hot_wallet, "mixer": mixer_address}
@@ -300,7 +365,8 @@ class RingBuilder:
             amount_inr = rng.uniform(60_000, 1_200_000)
             amount_btc = amount_inr / 5_500_000
 
-            self.add_tx(chain, [(victim_wallet, amount_btc)], [(collector, amount_btc, False)], ts, asset)
+            self.add_tx(chain, [(victim_wallet, amount_btc)],
+                        [(collector, amount_btc, False)], ts, asset)
             self.add_complaint(f"SYN-BTC-V{v + 1:03d}", collector, chain, amount_inr, days_ago)
 
         # Consolidation: co-spend groups of collectors into one output each.
@@ -326,8 +392,14 @@ class RingBuilder:
         current = consolidated[0] if consolidated else gen_btc_address(rng)
         for hop in range(3):
             ts = self.now - timedelta(days=max(1, 15 - hop * 4))
-            total = rng.uniform(0.2, 0.9)
-            spend = total * rng.uniform(0.6, 0.8)
+            total = self.held(current)
+            if total <= 0:
+                break
+            # A peel chain shaves a SMALL amount off to a payee and carries the
+            # bulk forward as change. Sending the majority to the dead-end payee
+            # (the earlier behaviour) left under 1% of the victims' money
+            # reaching the exchange, which is not how laundering looks.
+            spend = total * rng.uniform(0.10, 0.25)
             payee = gen_btc_address(rng)
             change = gen_btc_address(rng)  # fresh - never seen before this tx
             self.add_tx(
@@ -342,7 +414,9 @@ class RingBuilder:
         # Terminal deposits into two exchange addresses.
         for dest in (hot_wallet, deposit_2):
             ts = self.now - timedelta(days=rng.randint(1, 4))
-            amt = rng.uniform(0.1, 0.6)
+            amt = self.held(current) / 2.0
+            if amt <= 0:
+                break
             self.add_tx(chain, [(current, amt)], [(dest, amt, False)], ts, asset)
 
         self.entities.append(
@@ -352,8 +426,10 @@ class RingBuilder:
                 "jurisdiction": exchange_jurisdiction,
                 "website": f"https://{exchange_name.lower().replace(' ', '')}.example",
                 "addresses": [
-                    {"chain": chain, "address": hot_wallet, "label": f"{exchange_name} hot wallet 1"},
-                    {"chain": chain, "address": deposit_2, "label": f"{exchange_name} deposit pool"},
+                    {"chain": chain, "address": hot_wallet,
+                     "label": f"{exchange_name} hot wallet 1"},
+                    {"chain": chain, "address": deposit_2,
+                     "label": f"{exchange_name} deposit pool"},
                 ],
             }
         )
@@ -361,12 +437,13 @@ class RingBuilder:
 
 
 def build_dataset(seed: int = DEFAULT_SEED, now: datetime | None = None) -> dict:
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     b = RingBuilder(seed, now)
 
     tron = b.build_account_ring(
         chain="TRON",
-        asset="USDT-TRC20",
+        asset="USDT",
+        token_contract=USDT_TRC20_CONTRACT,
         exchange_name="Meridian Exchange",
         exchange_jurisdiction="Seychelles",
         victim_count=6,
@@ -378,6 +455,7 @@ def build_dataset(seed: int = DEFAULT_SEED, now: datetime | None = None) -> dict
     eth = b.build_account_ring(
         chain="ETH",
         asset="ETH",
+        token_contract=None,   # native ether
         exchange_name="Northwind Digital",
         exchange_jurisdiction="Estonia",
         victim_count=3,

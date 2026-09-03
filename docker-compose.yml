@@ -20,6 +20,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./infra/postgres/002_exposure.sql:/docker-entrypoint-initdb.d/02-exposure.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U sih -d sih183"]
       interval: 5s
@@ -84,6 +85,25 @@ services:
       NEO4J_PASSWORD: ${NEO4J_PASSWORD:-sihdevpass}
       REDIS_URL: redis://redis:6379/0
       DEMO_MODE: ${DEMO_MODE:-true}
+      # These must be forwarded explicitly. The backend's WORKDIR is /app,
+      # which is ./backend - so pydantic-settings reads backend/.env, never the
+      # root .env. Without these lines, setting JWT_SECRET in the root .env
+      # documented by .env.example would silently do nothing, which is the
+      # worst possible outcome for a security knob.
+      JWT_SECRET: ${JWT_SECRET:-insecure-demo-secret-replace-before-any-real-deployment}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-480}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-240}
+      RATE_LIMIT_AUTH_FAILURES: ${RATE_LIMIT_AUTH_FAILURES:-8}
+      RATE_LIMIT_AUTH_WINDOW_SECONDS: ${RATE_LIMIT_AUTH_WINDOW_SECONDS:-300}
+      ETHERSCAN_API_KEY: ${ETHERSCAN_API_KEY:-}
+      TRONGRID_API_KEY: ${TRONGRID_API_KEY:-}
+      BLOCKCHAIR_API_KEY: ${BLOCKCHAIR_API_KEY:-}
+      TRACE_MAX_DEPTH: ${TRACE_MAX_DEPTH:-8}
+      TRACE_MAX_BREADTH: ${TRACE_MAX_BREADTH:-25}
+      RISK_DECAY_HALF_LIFE_DAYS: ${RISK_DECAY_HALF_LIFE_DAYS:-90}
+      RISK_MEDIUM_THRESHOLD: ${RISK_MEDIUM_THRESHOLD:-40}
+      RISK_HIGH_THRESHOLD: ${RISK_HIGH_THRESHOLD:-70}
       # Lets ml/src/*.py import the app package when run via `compose exec`.
       PYTHONPATH: /app
       # uvicorn --reload watches via `watchfiles`, which relies on OS-level
@@ -100,6 +120,7 @@ services:
       # Writable: scripts/generate_synthetic_complaints.py emits the dataset here.
       - ./ml/seeds:/app/ml_seeds
       - ./infra/neo4j:/app/infra/neo4j:ro
+      - ./infra/postgres:/app/infra/postgres:ro
       - ./scripts:/app/scripts:ro
       # Whole ml/ tree: src (seed + train scripts), data, artifacts, seeds.
       - ./ml:/app/ml

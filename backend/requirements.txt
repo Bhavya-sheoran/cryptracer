@@ -8,7 +8,11 @@ alembic>=1.14
 neo4j>=5.26
 redis>=5.2
 httpx>=0.28
-python-jose[cryptography]>=3.3
+# PyJWT, not python-jose: jose depends on the pure-Python `ecdsa` package,
+# which carries PYSEC-2026-1325 with no fixed version. We sign with HMAC only,
+# so that code was never reached - but removing the dependency ends the
+# conversation instead of footnoting it. See services/auth.py:decode_token.
+PyJWT>=2.10
 # bcrypt used directly - passlib 1.7.4 breaks against bcrypt 4.1+ (see services/auth.py)
 bcrypt>=4.1
 python-multipart>=0.0.17

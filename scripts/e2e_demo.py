@@ -176,7 +176,7 @@ def websocket_collect(base: str, path: str, seconds: float = 6.0, limit: int = 4
             break
         try:
             chunk = sock.recv(8192)
-        except pysocket.timeout:
+        except TimeoutError:
             break
         if not chunk:
             break
@@ -216,8 +216,8 @@ def main() -> int:
                     form=True, expect=200)
     investigator, supervisor = inv["access_token"], sup["access_token"]
     r.token = investigator
-    r.check("both roles authenticate", inv["role"] == "investigator" and sup["role"] == "supervisor",
-            f"{inv['role']} / {sup['role']}")
+    both_roles = inv["role"] == "investigator" and sup["role"] == "supervisor"
+    r.check("both roles authenticate", both_roles, f"{inv['role']} / {sup['role']}")
 
     from app.services.connectors.synthetic import get_complaints  # noqa: PLC0415
     complaints = get_complaints()
@@ -238,7 +238,8 @@ def main() -> int:
                        body={"address": address, "victim_ref": "E2E-DEMO", "amount_inr": 250000,
                              "source": "synthetic"}, expect=201)
     case_id, case_number = intake["case_id"], intake["case_number"]
-    r.check("case opened", bool(case_number), f"{case_number} · provenance {intake['data_provenance']}")
+    r.check("case opened", bool(case_number),
+            f"{case_number} · provenance {intake['data_provenance']}")
 
     # --- 2. graph -------------------------------------------------------
     r.stage(2, "Money flow is traced into the graph")
@@ -260,8 +261,10 @@ def main() -> int:
     attribution = analysis["attribution"]
     terminals = analysis["terminal_attributions"]
     r.check("trace reaches a tagged service", len(terminals) > 0,
-            ", ".join(f"{t['entity_name']} (hop {t['hop']})" for t in terminals[:3]) or "none reached")
-    r.check("attribution states its method", attribution["method"] in ("tagged_db", "classifier", "none"),
+            ", ".join(f"{t['entity_name']} (hop {t['hop']})" for t in terminals[:3])
+            or "none reached")
+    r.check("attribution states its method",
+            attribution["method"] in ("tagged_db", "classifier", "none"),
             f"method = {attribution['method']}")
     if attribution["method"] == "tagged_db":
         r.check("a curated attribution cites its source", bool(attribution["source"]),
@@ -350,7 +353,8 @@ def main() -> int:
     r.check("hash verifies independently", recomputed == digest,
             f"recomputed {recomputed[:24]}… == stored {digest[:24]}…"
             if recomputed == digest else f"MISMATCH {recomputed} vs {digest}")
-    _, verify = r.call("GET", f"{API}/cases/{case_id}/report/{report['report_id']}/verify", expect=200)
+    verify_path = f"{API}/cases/{case_id}/report/{report['report_id']}/verify"
+    _, verify = r.call("GET", verify_path, expect=200)
     r.check("server-side verification agrees", verify["verified"] is True)
 
     # --- 9. evidence ----------------------------------------------------
@@ -381,7 +385,8 @@ def main() -> int:
                          "justification": "End-to-end integration check of the approval gate."},
                    expect=201)
     fid = fr["id"]
-    r.check("created as draft, never approved", fr["status"] == "draft" and fr["approved_by"] is None,
+    r.check("created as draft, never approved",
+            fr["status"] == "draft" and fr["approved_by"] is None,
             f"status = {fr['status']}")
 
     status, _ = r.call("POST", f"{API}/freeze-requests/{fid}/approve", body={}, token=supervisor)
@@ -427,7 +432,8 @@ def main() -> int:
     r.check("draft generated", draft["status"] == "draft")
     r.check("marked NOT FILED", "NOT FILED" in draft["body"])
     r.check("states its own limitations", "No KYC or account-holder information" in draft["body"])
-    status, _ = r.call("POST", f"{API}/str-drafts/{draft['id']}/approve", body={}, token=investigator)
+    status, _ = r.call("POST", f"{API}/str-drafts/{draft['id']}/approve",
+                       body={}, token=investigator)
     r.check("author cannot approve their own draft", status == 403, f"HTTP {status}")
 
     # --- 13. access control ----------------------------------------------

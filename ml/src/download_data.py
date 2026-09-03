@@ -314,7 +314,8 @@ def fetch_ofac(out_dir: Path = SEED_DIR) -> dict:
 
     by_chain: dict[str, int] = {}
     for e in entries:
-        by_chain[e["chain"] or e["currency_code"]] = by_chain.get(e["chain"] or e["currency_code"], 0) + 1
+        key = e["chain"] or e["currency_code"]
+        by_chain[key] = by_chain.get(key, 0) + 1
     print(f"[ofac] wrote {len(entries)} sanctioned addresses -> {out_path}")
     print(f"[ofac] by chain/code: {by_chain}")
     return payload["meta"]

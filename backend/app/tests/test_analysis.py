@@ -176,6 +176,33 @@ def test_score_is_explained_by_its_contributing_cases(analysed):
             assert c["case_number"]
 
 
+def test_case_lists_are_capped_but_the_totals_are_not(analysed):
+    """A heavily reported wallet must not return an unbounded response.
+
+    The cap is on the payload only. `contributing_case_count` reports every case
+    the score was computed from, so a truncated list can never be mistaken for
+    the complete audit trail.
+    """
+    body = analyse(analysed["TRON"], analysed["__auth__"]).json()
+    limit = body["listing_limit"]
+
+    assert limit > 0
+    assert len(body["contributions"]) <= limit
+    assert len(body["contributing_case_ids"]) <= limit
+    assert len(body["reported_in_cases"]) <= limit
+
+    # The totals are the real figures, and can legitimately exceed the cap.
+    assert body["contributing_case_count"] >= len(body["contributing_case_ids"])
+    assert body["reported_in_cases_total"] >= len(body["reported_in_cases"])
+
+
+def test_a_truncated_list_keeps_the_highest_scoring_cases(analysed):
+    """Truncation must not drop the cases that actually drove the score."""
+    body = analyse(analysed["TRON"], analysed["__auth__"]).json()
+    points = [c["points"] for c in body["contributions"]]
+    assert points == sorted(points, reverse=True)
+
+
 def test_contributions_are_ordered_by_influence(analysed):
     contributions = analyse(analysed["TRON"], analysed["__auth__"]).json()["contributions"]
     points = [c["points"] for c in contributions]

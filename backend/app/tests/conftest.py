@@ -7,12 +7,22 @@ when it is not reachable.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
-from decimal import Decimal
+import os
 
-import pytest
+# Set before anything imports app.config, whose settings are lru_cached at first
+# use. The whole suite shares one TestClient identity, so the per-IP limiter
+# would see a few hundred requests from a single "client" in well under a
+# minute and start returning 429 to tests that are about correctness, not
+# throughput. The limiter itself is covered by test_middleware.py, which builds
+# an app with it switched on.
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
-from app.services.connectors.base import ChainTransaction, TxIO
+from datetime import UTC, datetime, timedelta  # noqa: E402
+from decimal import Decimal  # noqa: E402
+
+import pytest  # noqa: E402
+
+from app.services.connectors.base import Asset, ChainTransaction, TxIO  # noqa: E402
 
 BASE_TIME = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -50,6 +60,8 @@ def tx(
     outputs: list[tuple[str, float]],
     minutes: int = 0,
     chain: str = "BTC",
+    asset: Asset | None = None,
+    status: str = "success",
 ) -> ChainTransaction:
     """Build a ChainTransaction concisely. `minutes` offsets from BASE_TIME."""
     return ChainTransaction(
@@ -58,7 +70,8 @@ def tx(
         timestamp=BASE_TIME + timedelta(minutes=minutes),
         block_height=800_000 + minutes,
         fee=Decimal("0.0001"),
-        asset=chain,
+        asset=asset or Asset.native(chain),
+        status=status,
         inputs=[TxIO(address=a, value=Decimal(str(v)), index=i) for i, (a, v) in enumerate(inputs)],
         outputs=[
             TxIO(address=a, value=Decimal(str(v)), index=i) for i, (a, v) in enumerate(outputs)

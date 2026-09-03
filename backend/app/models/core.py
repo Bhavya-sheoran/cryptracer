@@ -25,7 +25,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import INET, JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -421,6 +421,98 @@ class Alert(Base):
     )
     acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ---------------------------------------------------------------------------
+# Service exposure results
+# ---------------------------------------------------------------------------
+class ServiceExposureRecord(Base):
+    """A stored exposure finding.
+
+    Persisted because it is something an officer may act on: a freeze request
+    citing "78% of traced funds reached Meridian Exchange" has to be
+    reconstructable later, including the weights and price basis behind it.
+    """
+
+    __tablename__ = "service_exposures"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    chain: Mapped[str] = mapped_column(CHAIN_ENUM, nullable=False)
+    address_norm: Mapped[str] = mapped_column(Text, nullable=False)
+    case_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("cases.id", ondelete="SET NULL")
+    )
+
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    searched_to_hop: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    top_service: Mapped[str | None] = mapped_column(Text)
+    top_service_type: Mapped[str | None] = mapped_column(Text)
+    top_hop: Mapped[int | None] = mapped_column(Integer)
+    top_score: Mapped[Decimal | None] = mapped_column(Numeric(6, 4))
+    top_volume_inr: Mapped[Decimal | None] = mapped_column(Numeric(20, 2))
+
+    scoring_version: Mapped[str] = mapped_column(Text, nullable=False)
+    weights: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    explanation: Mapped[str | None] = mapped_column(Text)
+
+    computed_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id")
+    )
+    computed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    paths: Mapped[list[ExposurePathRecord]] = relationship(
+        back_populates="exposure", cascade="all, delete-orphan"
+    )
+
+
+class ExposurePathRecord(Base):
+    """One ranked candidate, with the arithmetic that produced its rank.
+
+    The explanation is stored rather than recomputed - recomputing it later
+    against different weights would silently rewrite history.
+    """
+
+    __tablename__ = "exposure_paths"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    exposure_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("service_exposures.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    service: Mapped[str] = mapped_column(Text, nullable=False)
+    service_type: Mapped[str | None] = mapped_column(Text)
+    service_address: Mapped[str | None] = mapped_column(Text)
+    hop: Mapped[int] = mapped_column(Integer, nullable=False)
+    score: Mapped[Decimal | None] = mapped_column(Numeric(6, 4))
+
+    total_volume: Mapped[Decimal | None] = mapped_column(Numeric(38, 18))
+    total_volume_inr: Mapped[Decimal | None] = mapped_column(Numeric(20, 2))
+    volume_basis: Mapped[str | None] = mapped_column(Text)
+    transfer_count: Mapped[int | None] = mapped_column(Integer)
+    unique_counterparties: Mapped[int | None] = mapped_column(Integer)
+    continuity_ok: Mapped[bool | None] = mapped_column(Boolean)
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    label_confidence: Mapped[float | None] = mapped_column(Float)
+    label_sources: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    price_sources: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+
+    path: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    features: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    explanation: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+
+    evidence_txid: Mapped[str | None] = mapped_column(Text)
+    evidence_amount: Mapped[Decimal | None] = mapped_column(Numeric(38, 18))
+    evidence_asset: Mapped[str | None] = mapped_column(Text)
+    evidence_timestamp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    exposure: Mapped[ServiceExposureRecord] = relationship(back_populates="paths")
 
 
 __all__ = [

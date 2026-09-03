@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import (
     auth,
     cases,
+    exposure,
     freeze,
     health,
     ncrp,
@@ -21,9 +22,11 @@ from app.api.v1 import (
     wallets,
     ws,
 )
-from app.config import get_settings
+from app.config import check_secrets, get_settings
 from app.db import neo4j as neo4j_db
+from app.db import postgres as postgres_db
 from app.db import redis_client
+from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -33,12 +36,23 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Before anything else: refuse to serve real data with placeholder secrets.
+    # In demo mode this logs warnings instead of raising.
+    check_secrets(settings)
+
     # Neo4j may still be electing itself on first boot; a failure here must not
     # kill the API, since /health/ready is what reports the real state.
     try:
         neo4j_db.apply_constraints()
     except Exception as exc:
         logger.warning("neo4j constraint bootstrap deferred: %s", exc)
+
+    # Schema added after the database was first created never reaches an
+    # existing volume through docker-entrypoint-initdb.d, which only runs once.
+    try:
+        postgres_db.apply_pending_ddl()
+    except Exception as exc:
+        logger.warning("postgres DDL bootstrap deferred: %s", exc)
 
     if settings.demo_mode:
         logger.info("DEMO_MODE=true - blockchain connectors will serve SYNTHETIC data")
@@ -64,6 +78,18 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Middleware is applied outermost-last, so this reads bottom-up: CORS wraps
+    # everything (a 429 still needs its headers or the browser reports an
+    # opaque network error), then security headers, then the limiter - which
+    # means a throttled response is still hardened.
+    if settings.rate_limit_enabled:
+        app.add_middleware(
+            RateLimitMiddleware,
+            general_per_minute=settings.rate_limit_per_minute,
+            auth_failures=settings.rate_limit_auth_failures,
+            auth_window=settings.rate_limit_auth_window_seconds,
+        )
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
@@ -75,6 +101,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router, prefix=settings.api_prefix)
     app.include_router(wallets.router, prefix=settings.api_prefix)
     app.include_router(wallet_analysis.router, prefix=settings.api_prefix)
+    app.include_router(exposure.router, prefix=settings.api_prefix)
     app.include_router(auth.router, prefix=settings.api_prefix)
     app.include_router(cases.router, prefix=settings.api_prefix)
     app.include_router(freeze.router, prefix=settings.api_prefix)

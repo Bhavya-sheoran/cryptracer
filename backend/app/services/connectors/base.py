@@ -20,6 +20,61 @@ from decimal import Decimal
 # Chains whose transactions carry real UTXO structure worth clustering on.
 UTXO_CHAINS = frozenset({"BTC"})
 
+# Native currency symbol per chain, used when no token contract is involved.
+NATIVE_SYMBOL = {"BTC": "BTC", "ETH": "ETH", "TRON": "TRX"}
+NATIVE_DECIMALS = {"BTC": 8, "ETH": 18, "TRON": 6}
+
+# Transaction outcome. Only `success` moved value.
+STATUS_SUCCESS = "success"
+STATUS_FAILED = "failed"
+STATUS_UNKNOWN = "unknown"
+
+# What kind of movement an entry represents.
+TRANSFER_NATIVE = "native"
+TRANSFER_TOKEN = "token"
+
+
+@dataclass(frozen=True)
+class Asset:
+    """What actually moved.
+
+    A bare symbol string is not an identity: on Ethereum anyone can deploy a
+    contract calling itself "USDT". The contract address is the identity, and
+    an investigator writing a case file needs it - "100 USDT" is only meaningful
+    alongside the contract that issued it.
+
+    `contract is None` means the chain's native currency (BTC, ETH, TRX), which
+    has no contract by definition.
+    """
+
+    chain: str
+    symbol: str
+    contract: str | None = None
+    decimals: int = 18
+
+    @property
+    def is_native(self) -> bool:
+        return self.contract is None
+
+    @property
+    def key(self) -> str:
+        """Stable identity, safe to group and compare on."""
+        if self.contract is None:
+            return f"{self.chain}:native"
+        # ETH contracts are case-insensitive; normalise so the same token does
+        # not appear twice under different capitalisation.
+        contract = self.contract.lower() if self.chain == "ETH" else self.contract
+        return f"{self.chain}:{contract}"
+
+    @classmethod
+    def native(cls, chain: str) -> Asset:
+        return cls(
+            chain=chain,
+            symbol=NATIVE_SYMBOL.get(chain, chain),
+            contract=None,
+            decimals=NATIVE_DECIMALS.get(chain, 18),
+        )
+
 
 @dataclass(frozen=True)
 class TxIO:
@@ -42,7 +97,22 @@ class ChainTransaction:
     outputs: list[TxIO] = field(default_factory=list)
     block_height: int | None = None
     fee: Decimal = Decimal(0)
-    asset: str = ""
+    asset: Asset | None = None
+    #: `failed` transactions are recorded as attempts but move no value.
+    status: str = STATUS_SUCCESS
+
+    def __post_init__(self) -> None:
+        if self.asset is None:
+            self.asset = Asset.native(self.chain)
+
+    @property
+    def transfer_type(self) -> str:
+        return TRANSFER_NATIVE if self.asset.is_native else TRANSFER_TOKEN
+
+    @property
+    def moved_value(self) -> bool:
+        """A reverted transaction consumed gas but transferred nothing."""
+        return self.status == STATUS_SUCCESS
 
     @property
     def is_utxo(self) -> bool:

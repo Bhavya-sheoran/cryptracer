@@ -9,6 +9,12 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends build-essential curl libgomp1 \
  && rm -rf /var/lib/apt/lists/*
 
+# The base image ships pip 24.0 and setuptools 79.x, which between them carry
+# eight advisories that pip-audit reports against this image. They are build
+# tooling rather than runtime dependencies, but upgrading first is one line and
+# leaves the audit clean instead of caveated.
+RUN pip install --no-cache-dir --upgrade pip setuptools
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

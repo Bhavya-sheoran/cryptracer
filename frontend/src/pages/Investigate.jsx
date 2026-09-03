@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import WalletInputForm from '../components/WalletInputForm.jsx';
 import SankeyTrace from '../components/SankeyTrace.jsx';
+import ExposurePanel from '../components/ExposurePanel.jsx';
 import RiskPanel from '../components/RiskPanel.jsx';
 import ContributingCases from '../components/ContributingCases.jsx';
 import AttributionCard from '../components/AttributionCard.jsx';
@@ -31,7 +32,7 @@ export default function Investigate({ currentUser, submitted }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
-  const [tab, setTab] = useState('flow');
+  const [tab, setTab] = useState('exposure');
   const runRef = useRef(null);
 
   useEffect(() => {
@@ -49,7 +50,7 @@ export default function Investigate({ currentUser, submitted }) {
     setSelected(null);
     try {
       setAnalysis(await analyseWallet(address));
-      setTab('flow');
+      setTab('exposure');
     } catch (err) {
       setAnalysis(null);
       setError(
@@ -80,7 +81,7 @@ export default function Investigate({ currentUser, submitted }) {
         setIntake(result);
         toast(`Case ${result.case_number} opened · ${result.trace.hops_discovered} hops traced`);
         setAnalysis(await analyseWallet(payload.address));
-        setTab('flow');
+        setTab('exposure');
         return result;
       } catch (err) {
         setError(err.message);
@@ -165,7 +166,7 @@ export default function Investigate({ currentUser, submitted }) {
                   <span className="mono">{Number(analysis.risk_score).toFixed(1)}</span>
                 </span>
               }
-              sub={`${analysis.contributing_case_ids.length} contributing case(s)`}
+              sub={`${analysis.contributing_case_count} contributing case(s)`}
             />
           </div>
 
@@ -191,12 +192,21 @@ export default function Investigate({ currentUser, submitted }) {
               active={tab}
               onChange={setTab}
               tabs={[
+                { id: 'exposure', label: 'Service exposure' },
                 { id: 'flow', label: 'Money flow' },
                 { id: 'attribution', label: 'Attribution' },
-                { id: 'risk', label: 'Risk', count: analysis.contributing_case_ids.length },
+                { id: 'risk', label: 'Risk', count: analysis.contributing_case_count },
                 { id: 'case', label: 'Case file' },
               ]}
             />
+
+            {tab === 'exposure' ? (
+              <ExposurePanel
+                address={analysis.address}
+                maxHops={analysis.trace_path.depth}
+                onSelectAddress={setSelected}
+              />
+            ) : null}
 
             {tab === 'flow' ? (
               <>
@@ -250,6 +260,7 @@ export default function Investigate({ currentUser, submitted }) {
                   <ContributingCases
                     contributions={analysis.contributions}
                     totalScore={analysis.risk_score}
+                    total={analysis.contributing_case_count}
                   />
                 </div>
               </div>

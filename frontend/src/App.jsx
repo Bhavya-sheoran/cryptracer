@@ -7,7 +7,7 @@ import AlertsPage from './pages/AlertsPage.jsx';
 import ExchangesPage from './pages/ExchangesPage.jsx';
 import SignIn from './components/SignIn.jsx';
 import ServiceStatus from './components/ServiceStatus.jsx';
-import { fetchReadiness, fetchRecentAlerts } from './api/client.js';
+import { fetchReadiness, fetchRecentAlerts, login, seedDemoUsers } from './api/client.js';
 
 const NAV = [
   { id: 'investigate', label: 'Investigate', glyph: '⌕' },
@@ -81,13 +81,39 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  // A deep link (?address=…) lands straight on a trace.
+  // Deep links. `?address=` lands straight on a trace; `?demo=investigator`
+  // additionally signs in first, because every view worth linking to now
+  // requires an officer.
+  //
+  // This uses exactly the endpoints the "Sign in as <role>" buttons already
+  // call, with the credentials already published in the sign-in panel - it
+  // opens no door that is not already open. It must be removed alongside the
+  // demo accounts and /auth/seed-demo-users before any real deployment.
   useEffect(() => {
-    const deep = new URLSearchParams(window.location.search).get('address');
-    if (deep) {
-      setQuery(deep);
-      setSubmitted({ address: deep, at: Date.now() });
+    const params = new URLSearchParams(window.location.search);
+    const deepAddress = params.get('address');
+    const demoRole = params.get('demo');
+
+    async function start() {
+      if (demoRole === 'investigator' || demoRole === 'supervisor') {
+        try {
+          await seedDemoUsers();
+          const account = await login(demoRole, `${demoRole}123`);
+          setUser({
+            full_name: account.full_name,
+            role: account.role,
+            can_approve: account.role === 'supervisor' || account.role === 'admin',
+          });
+        } catch {
+          // Fall through signed out; the sign-in panel is still there.
+        }
+      }
+      if (deepAddress) {
+        setQuery(deepAddress);
+        setSubmitted({ address: deepAddress, at: Date.now() });
+      }
     }
+    start();
   }, []);
 
   function runSearch(event) {

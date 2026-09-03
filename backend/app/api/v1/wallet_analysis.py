@@ -12,7 +12,7 @@ this endpoint is built so that never happens.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -28,6 +28,16 @@ from app.services.chain_detect import detect
 
 router = APIRouter(tags=["analysis"])
 settings = get_settings()
+
+# A wallet named in a large fraud ring can be reported hundreds of times, and
+# this endpoint used to embed every one of those case records - the response
+# grew without bound and no investigator reads past the first screen anyway.
+#
+# The cap is on the *payload*, never on the arithmetic: the score below is
+# still computed across every contributing case, and every one of them is
+# persisted to `risk_contributions`. The response now says how many there were
+# so a truncated list can never be mistaken for the whole picture.
+MAX_LISTED_CASES = 50
 
 
 @router.get("/wallet", response_model=WalletAnalysisResponse)
@@ -95,6 +105,17 @@ def analyse_wallet(
     )
 
     # --- cases naming this wallet ---------------------------------------
+    # Most recent first, capped. The total is counted separately so the UI can
+    # say "showing 50 of 312" rather than quietly implying there were 50.
+    reported_in_query = (
+        select(Case)
+        .join(CaseWallet, CaseWallet.case_id == Case.id)
+        .join(Wallet, Wallet.id == CaseWallet.wallet_id)
+        .where(Wallet.chain == chain, Wallet.address_norm == address_norm)
+    )
+    reported_in_total = db.execute(
+        select(func.count()).select_from(reported_in_query.subquery())
+    ).scalar_one()
     reported_in = [
         {
             "case_id": str(c.id),
@@ -103,15 +124,16 @@ def analyse_wallet(
             "status": c.status,
         }
         for c in db.execute(
-            select(Case)
-            .join(CaseWallet, CaseWallet.case_id == Case.id)
-            .join(Wallet, Wallet.id == CaseWallet.wallet_id)
-            .where(Wallet.chain == chain, Wallet.address_norm == address_norm)
-            .order_by(Case.reported_at.desc())
+            reported_in_query.order_by(Case.reported_at.desc()).limit(MAX_LISTED_CASES)
         )
         .scalars()
         .all()
     ]
+
+    # `risk.contributions` arrives sorted by points, so truncating keeps the
+    # cases that actually drove the score rather than an arbitrary slice.
+    contributions = risk.contributions[:MAX_LISTED_CASES]
+    contributing_case_ids = risk.contributing_case_ids[:MAX_LISTED_CASES]
 
     # --- real-time alert -------------------------------------------------
     # A Medium/High resolution is pushed to the dashboard over Redis Streams ->
@@ -145,10 +167,13 @@ def analyse_wallet(
         risk_score=risk.score,
         risk_explanation=risk.explanation,
         risk_factors=risk.factors,
-        contributing_case_ids=risk.contributing_case_ids,
-        contributions=risk.contributions,
+        contributing_case_ids=contributing_case_ids,
+        contributions=contributions,
+        contributing_case_count=len(risk.contributing_case_ids),
         mixer_interaction=mixer_hit,
         reported_in_cases=reported_in,
+        reported_in_cases_total=reported_in_total,
+        listing_limit=MAX_LISTED_CASES,
         data_provenance="synthetic" if settings.demo_mode else "live_indexer_apis",
         notice=(
             "Recommendation only. Any freeze or disclosure request requires explicit "

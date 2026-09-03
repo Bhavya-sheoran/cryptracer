@@ -17,7 +17,14 @@ from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
-from app.services.connectors.base import BlockchainConnector, ChainTransaction, ConnectorError, TxIO
+from app.services.connectors.base import (
+    STATUS_SUCCESS,
+    Asset,
+    BlockchainConnector,
+    ChainTransaction,
+    ConnectorError,
+    TxIO,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +50,23 @@ def dataset_path() -> Path | None:
     return None
 
 
+def _parse_asset(raw: dict) -> Asset:
+    """Build the asset from the dataset row.
+
+    Rows carry `token_contract` when the transfer is a token; its absence means
+    the chain's native currency.
+    """
+    contract = raw.get("token_contract")
+    if not contract:
+        return Asset.native(raw["chain"])
+    return Asset(
+        chain=raw["chain"],
+        symbol=raw.get("asset") or "TOKEN",
+        contract=contract,
+        decimals=int(raw.get("token_decimals", 6)),
+    )
+
+
 def _parse_tx(raw: dict) -> ChainTransaction:
     return ChainTransaction(
         chain=raw["chain"],
@@ -50,7 +74,8 @@ def _parse_tx(raw: dict) -> ChainTransaction:
         timestamp=datetime.fromisoformat(raw["timestamp"]),
         block_height=raw.get("block_height"),
         fee=Decimal(str(raw.get("fee", 0))),
-        asset=raw.get("asset", ""),
+        asset=_parse_asset(raw),
+        status=raw.get("status", STATUS_SUCCESS),
         inputs=[
             TxIO(address=i["address"], value=Decimal(str(i["value"])), index=i.get("index", 0))
             for i in raw["inputs"]

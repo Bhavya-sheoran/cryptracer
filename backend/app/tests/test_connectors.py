@@ -161,6 +161,84 @@ def test_limit_is_respected(dataset):
     assert len(connector.get_transactions(complaint["address"], limit=1)) <= 1
 
 
+def test_token_transfers_carry_a_contract_address(dataset):
+    """A symbol is not an identity - anyone can deploy a contract called USDT.
+
+    The TRON ring moves USDT-TRC20, so those transactions must carry the token
+    contract. Without it an investigator cannot tell real USDT from an
+    impostor token with the same ticker.
+    """
+    connector = get_connector("TRON", demo_mode=True)
+    complaint = next(c for c in get_complaints() if c["chain"] == "TRON")
+    txs = connector.get_transactions(complaint["address"])
+    assert txs
+
+    for tx in txs:
+        assert tx.asset.contract, "a TRC-20 transfer must name its contract"
+        assert tx.asset.is_native is False
+        assert tx.transfer_type == "token"
+        # Identity is the contract, not the ticker.
+        assert tx.asset.key == f"TRON:{tx.asset.contract}"
+
+
+def test_native_transfers_have_no_contract(dataset):
+    """BTC and ETH in this dataset move native currency, which has no contract."""
+    for chain in ("BTC", "ETH"):
+        connector = get_connector(chain, demo_mode=True)
+        complaint = next(c for c in get_complaints() if c["chain"] == chain)
+        txs = connector.get_transactions(complaint["address"])
+        assert txs
+        for tx in txs:
+            assert tx.asset.is_native is True
+            assert tx.asset.contract is None
+            assert tx.transfer_type == "native"
+            assert tx.asset.key == f"{chain}:native"
+
+
+def test_eth_asset_key_is_case_insensitive():
+    """The same ERC-20 written in different case must be one asset, not two."""
+    from app.services.connectors.base import Asset
+
+    upper = Asset(chain="ETH", symbol="USDT", contract="0xDAC17F958D2EE523A2206206994597C13D831EC7")
+    lower = Asset(chain="ETH", symbol="USDT", contract="0xdac17f958d2ee523a2206206994597c13d831ec7")
+    assert upper.key == lower.key
+
+
+def test_failed_transactions_move_no_value(graph):
+    """A reverted transaction burned gas but transferred nothing.
+
+    It is still recorded as an attempt (the :Transaction node and its
+    SENT/RECEIVED_BY edges survive) because the attempt is evidence - but it
+    must never appear as value flow.
+    """
+    from app.tests.conftest import tx as make_tx
+
+    graph.write_transactions(
+        [
+            make_tx("ok_tx", [("payerA", 1.0)], [("payeeA", 1.0)], minutes=0),
+            make_tx("bad_tx", [("payerB", 5.0)], [("payeeB", 5.0)], minutes=1, status="failed"),
+        ]
+    )
+
+    from app.db.neo4j import get_driver
+
+    with get_driver().session() as session:
+        transfers = [
+            r["txid"]
+            for r in session.run(
+                "MATCH (:Address)-[tr:TRANSFERRED]->(:Address) RETURN tr.txid AS txid"
+            )
+        ]
+        recorded = [
+            r["txid"]
+            for r in session.run("MATCH (t:Transaction) RETURN t.txid AS txid, t.status AS status")
+        ]
+
+    assert "ok_tx" in transfers
+    assert "bad_tx" not in transfers, "a failed transaction must not create value flow"
+    assert "bad_tx" in recorded, "but the attempt itself is still evidence"
+
+
 def test_eth_lookup_works_by_normalised_address(dataset):
     """Regression: the index must be keyed on the normalised address.
 

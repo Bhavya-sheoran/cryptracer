@@ -20,6 +20,25 @@ function authHeaders(extra) {
   return headers;
 }
 
+/** A trace walks up to eight hops and, in live mode, retries throttled indexer
+ *  calls, so it is legitimately slow. This is a ceiling on hanging, not a
+ *  performance target: without it a stalled backend leaves the dashboard
+ *  spinning with nothing to click and nothing to read. */
+const REQUEST_TIMEOUT_MS = 60_000;
+
+/** Read the error message out of a response body, whatever shape it is in. */
+async function errorDetail(res, fallback) {
+  try {
+    const body = await res.json();
+    if (body?.detail) {
+      return typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
+    }
+  } catch {
+    // Non-JSON error body (a proxy's HTML error page, say). Keep the fallback.
+  }
+  return fallback;
+}
+
 /**
  * Thin fetch wrapper. Throws on non-2xx so callers handle one failure path.
  * FastAPI puts its message in `detail`, so surface that rather than a bare code -
@@ -28,16 +47,32 @@ function authHeaders(extra) {
 async function request(path, options) {
   const opts = { ...(options || {}) };
   opts.headers = authHeaders(opts.headers);
-  const res = await fetch(`${API_BASE}${path}`, opts);
-  if (!res.ok) {
-    let detail = `${res.status} ${res.statusText}`;
-    try {
-      const body = await res.json();
-      if (body?.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
-    } catch {
-      // non-JSON error body; keep the status line
+  opts.signal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, opts);
+  } catch (err) {
+    // A timeout and a dead backend both land here, and they need different
+    // answers: one means wait, the other means start the stack.
+    if (err?.name === 'TimeoutError') {
+      const timeout = new Error(
+        `The request took longer than ${REQUEST_TIMEOUT_MS / 1000}s and was cancelled. `
+        + 'The backend may still be tracing - try again in a moment.',
+      );
+      timeout.status = 0;
+      throw timeout;
     }
-    const err = new Error(detail);
+    throw err;
+  }
+
+  if (!res.ok) {
+    const detail = await errorDetail(res, `${res.status} ${res.statusText}`);
+    const err = new Error(
+      res.status === 429
+        ? `${detail} (retry after ${res.headers.get('Retry-After') || 'a short wait'}s)`
+        : detail,
+    );
     err.status = res.status;
     throw err;
   }
@@ -77,6 +112,22 @@ export function analyseWallet(address, depth) {
   return apiGet(`/api/v1/wallet?${params.toString()}`);
 }
 
+/**
+ * Which service did this wallet's money reach, and why is that the answer.
+ * Direct exposure short-circuits; otherwise candidates come back ranked with
+ * a per-feature contribution breakdown.
+ */
+export function fetchExposure(address, maxHops = 8) {
+  const params = new URLSearchParams({ address, max_hops: String(maxHops) });
+  return apiGet(`/api/v1/exposure?${params.toString()}`);
+}
+
+/** Previous findings for this address - lets an investigator see it change. */
+export function fetchExposureHistory(address, limit = 20) {
+  const params = new URLSearchParams({ address, limit: String(limit) });
+  return apiGet(`/api/v1/exposure/history?${params.toString()}`);
+}
+
 export function fetchRankedExchanges(limit = 20) {
   return apiGet(`/api/v1/exchanges/ranked?limit=${limit}`);
 }
@@ -99,13 +150,9 @@ export async function login(username, password) {
     body,
   });
   if (!res.ok) {
-    let detail = 'Sign-in failed';
-    try {
-      detail = (await res.json()).detail || detail;
-    } catch {
-      /* keep the default */
-    }
-    throw new Error(detail);
+    const err = new Error(await errorDetail(res, 'Sign-in failed'));
+    err.status = res.status;
+    throw err;
   }
   const data = await res.json();
   setAuthToken(data.access_token);
@@ -139,13 +186,9 @@ export async function uploadEvidence(caseId, file) {
     body: form,
   });
   if (!res.ok) {
-    let detail = `Upload failed (${res.status})`;
-    try {
-      detail = (await res.json()).detail || detail;
-    } catch {
-      /* keep the default */
-    }
-    throw new Error(detail);
+    const err = new Error(await errorDetail(res, `Upload failed (${res.status})`));
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
+from decimal import Decimal
 
 from app.db.neo4j import get_driver
 from app.services.connectors.base import ChainTransaction
@@ -36,6 +37,10 @@ MERGE (t:Transaction {chain: tx.chain, txid: tx.txid})
                 t.output_count = size(tx.outputs)
   ON MATCH  SET t.input_count = size(tx.inputs),
                 t.output_count = size(tx.outputs)
+  SET         t.asset_key = tx.asset_key,
+              t.token_contract = tx.token_contract,
+              t.transfer_type = tx.transfer_type,
+              t.status = tx.status
 
 // --- inputs -------------------------------------------------------------
 WITH t, tx
@@ -75,16 +80,22 @@ CALL (t, tx) {
 }
 
 // --- denormalised transfer edges (tracing path) -------------------------
+// Pairs are computed in Python (see _transfer_pairs) rather than by an
+// UNWIND x UNWIND cartesian product here. That earlier form set the FULL
+// output value on every input->output edge, so summing edge values across a
+// UTXO path overstated volume by a factor equal to the input count.
 WITH tx
-UNWIND tx.inputs AS inp
-UNWIND tx.outputs AS outp
-MATCH (a:Address {chain: tx.chain, address_norm: inp.address_norm})
-MATCH (b:Address {chain: tx.chain, address_norm: outp.address_norm})
-WHERE a.address_norm <> b.address_norm
+UNWIND tx.transfers AS t
+MATCH (a:Address {chain: tx.chain, address_norm: t.from_norm})
+MATCH (b:Address {chain: tx.chain, address_norm: t.to_norm})
 MERGE (a)-[tr:TRANSFERRED {txid: tx.txid}]->(b)
-  ON CREATE SET tr.value = outp.value,
-                tr.timestamp = datetime(tx.timestamp),
-                tr.asset = tx.asset
+  SET tr.value            = t.value,
+      tr.value_attributed = t.value_attributed,
+      tr.timestamp        = datetime(tx.timestamp),
+      tr.asset            = tx.asset,
+      tr.asset_key        = tx.asset_key,
+      tr.token_contract   = tx.token_contract,
+      tr.transfer_type    = tx.transfer_type
 RETURN count(*) AS edges
 """
 
@@ -114,6 +125,81 @@ RETURN count(r) AS linked
 from app.services.chain_detect import normalize_address as _normalise_address  # noqa: E402
 
 
+def _transfer_pairs(tx: ChainTransaction) -> list[dict]:
+    """Flatten a transaction into address-to-address transfers with a value that
+    is safe to sum across a path.
+
+    A UTXO transaction has no per-pair value on chain: N inputs fund M outputs
+    collectively, and which rupee went where is not recorded. Attributing the
+    full output value to every input->output pair (the previous behaviour)
+    inflates any path total by the input count - a 2-input transaction moving
+    0.369 BTC summed to 0.739.
+
+    We instead split each output across the inputs in proportion to what each
+    input contributed:
+
+        attributed(i, o) = o.value * (i.value / total_input_value)
+
+    Summed over every pair this telescopes back to the true total output value,
+    so `sum(tr.value_attributed)` along a path is a defensible volume figure.
+    `tr.value` keeps the raw output amount, because that is what appears on the
+    block explorer and belongs in evidence.
+
+    Account-model chains have exactly one input and one output, so attributed
+    and raw are identical and this is a no-op for them.
+
+    A failed transaction yields no pairs at all. It consumed gas but moved
+    nothing, so it must never appear as value flow - while the :Transaction node
+    and its SENT/RECEIVED_BY edges still record that the attempt was made, which
+    is itself evidence.
+    """
+    if not tx.moved_value:
+        return []
+
+    # Collapse repeated addresses first. One address commonly appears as several
+    # inputs (spending several UTXOs it owns) or several outputs; pairing before
+    # collapsing would count its value once per occurrence.
+    inputs_by_addr: dict[str, Decimal] = {}
+    for inp in tx.inputs:
+        norm = _normalise_address(tx.chain, inp.address)
+        inputs_by_addr[norm] = inputs_by_addr.get(norm, Decimal(0)) + inp.value
+
+    outputs_by_addr: dict[str, Decimal] = {}
+    for out in tx.outputs:
+        norm = _normalise_address(tx.chain, out.address)
+        outputs_by_addr[norm] = outputs_by_addr.get(norm, Decimal(0)) + out.value
+
+    total_in = sum(inputs_by_addr.values(), Decimal(0))
+    n_inputs = max(len(inputs_by_addr), 1)
+
+    pairs: list[dict] = []
+    for to_norm, out_value in outputs_by_addr.items():
+        for from_norm, in_value in inputs_by_addr.items():
+            if from_norm == to_norm:
+                continue  # change returning to the spender is not a transfer
+
+            if total_in > 0:
+                share = out_value * (in_value / total_in)
+            else:
+                # Coinbase, or an input set carrying no recorded value: split
+                # evenly rather than crediting each input with the whole output.
+                share = out_value / Decimal(n_inputs)
+
+            pairs.append(
+                {
+                    "from_norm": from_norm,
+                    "to_norm": to_norm,
+                    # Raw amount this address received in this transaction -
+                    # what a block explorer shows, so it belongs in evidence.
+                    "value": float(out_value),
+                    # Safe to sum along a path.
+                    "value_attributed": float(share),
+                }
+            )
+
+    return pairs
+
+
 def _tx_to_params(tx: ChainTransaction) -> dict:
     return {
         "chain": tx.chain,
@@ -121,7 +207,14 @@ def _tx_to_params(tx: ChainTransaction) -> dict:
         "timestamp": tx.timestamp.isoformat(),
         "block_height": tx.block_height,
         "fee": float(tx.fee),
-        "asset": tx.asset,
+        # `asset` stays a display symbol so the Sankey tooltip and every
+        # existing consumer keep working; identity travels alongside it.
+        "asset": tx.asset.symbol,
+        "asset_key": tx.asset.key,
+        "token_contract": tx.asset.contract,
+        "transfer_type": tx.transfer_type,
+        "status": tx.status,
+        "transfers": _transfer_pairs(tx),
         "inputs": [
             {
                 "address": i.address,

@@ -26,7 +26,6 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-import uuid
 
 GREEN, RED, YELLOW, DIM, BOLD, RESET = (
     "\033[32m", "\033[31m", "\033[33m", "\033[2m", "\033[1m", "\033[0m"
@@ -110,7 +109,8 @@ def main() -> int:
                            "justification": "RBAC audit fixture for the approval gate."})
     freeze_id = json.loads(raw)["id"]
     request(base, "POST", f"{API}/freeze-requests/{freeze_id}/submit", token=investigator, body={})
-    _, raw = request(base, "POST", f"{API}/str-drafts", token=investigator, body={"case_id": case_id})
+    _, raw = request(base, "POST", f"{API}/str-drafts", token=investigator,
+                     body={"case_id": case_id})
     draft_id = json.loads(raw)["id"]
 
     probes = [
@@ -141,7 +141,8 @@ def main() -> int:
     ]
 
     failures = []
-    print(f"{BOLD}{'class':9s} {'method':6s} {'endpoint':52s} {'anon':>5s} {'inv':>5s} {'sup':>5s}{RESET}")
+    print(f"{BOLD}{'class':9s} {'method':6s} {'endpoint':52s} "
+          f"{'anon':>5s} {'inv':>5s} {'sup':>5s}{RESET}")
     print(DIM + "-" * 92 + RESET)
 
     for expected, method, path, body in probes:
@@ -194,7 +195,8 @@ def main() -> int:
     ]:
         status, _ = request(base, "GET", f"{API}/auth/me", token=tok)
         ok = status in want
-        print(f"  [{GREEN + 'PASS' + RESET if ok else RED + 'FAIL' + RESET}] {label} (HTTP {status})")
+        mark = GREEN + "PASS" + RESET if ok else RED + "FAIL" + RESET
+        print(f"  [{mark}] {label} (HTTP {status})")
         if not ok:
             failures.append((label, f"expected {want}, got {status}"))
 
@@ -211,7 +213,8 @@ def main() -> int:
     for label, method, path, body, want in checks:
         status, _ = request(base, method, path, token=investigator, body=body)
         ok = status in want
-        print(f"  [{GREEN + 'PASS' + RESET if ok else RED + 'FAIL' + RESET}] {label} (HTTP {status})")
+        mark = GREEN + "PASS" + RESET if ok else RED + "FAIL" + RESET
+        print(f"  [{mark}] {label} (HTTP {status})")
         if not ok:
             failures.append((label, f"expected one of {want}, got {status}"))
 

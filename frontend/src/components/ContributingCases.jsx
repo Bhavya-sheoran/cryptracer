@@ -9,7 +9,7 @@ import { EmptyState } from './ui/Bits.jsx';
  * not actionable, so this renders even when empty - saying so plainly rather
  * than hiding.
  */
-export default function ContributingCases({ contributions, totalScore }) {
+export default function ContributingCases({ contributions, totalScore, total }) {
   if (!contributions || contributions.length === 0) {
     return (
       <EmptyState glyph="◔" title="Nothing contributing yet">
@@ -19,6 +19,12 @@ export default function ContributingCases({ contributions, totalScore }) {
   }
 
   const sum = contributions.reduce((a, c) => a + (Number(c.points) || 0), 0);
+  // A heavily reported wallet returns a capped list. The score is still
+  // computed over every case, so the table can no longer claim to be the
+  // complete arithmetic - and saying so is the whole point of this panel.
+  const shown = contributions.length;
+  const allOf = total || shown;
+  const truncated = allOf > shown;
 
   return (
     <>
@@ -46,7 +52,11 @@ export default function ContributingCases({ contributions, totalScore }) {
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={4}>{contributions.length} contributing case(s)</td>
+              <td colSpan={4}>
+                {truncated
+                  ? `highest-scoring ${shown} of ${allOf} contributing case(s)`
+                  : `${shown} contributing case(s)`}
+              </td>
               <td className="num mono">{sum.toFixed(2)}</td>
             </tr>
           </tfoot>
@@ -54,8 +64,15 @@ export default function ContributingCases({ contributions, totalScore }) {
       </div>
       <p className="hint" style={{ marginTop: 'var(--sp-3)' }}>
         points = 10 × 0.5^(age ÷ half-life). Those points, plus any aggravating factors, map onto
-        0–100 by a saturating curve giving {Number(totalScore).toFixed(2)} — recomputable by hand
-        from this table.
+        0–100 by a saturating curve giving {Number(totalScore).toFixed(2)}
+        {truncated ? (
+          <>
+            {' '}— computed across all {allOf} cases. This table shows the {shown} highest
+            contributors, so the column total above is a subtotal, not the whole score.
+          </>
+        ) : (
+          <> — recomputable by hand from this table.</>
+        )}
       </p>
     </>
   );
@@ -64,5 +81,6 @@ export default function ContributingCases({ contributions, totalScore }) {
 ContributingCases.propTypes = {
   contributions: PropTypes.arrayOf(PropTypes.object),
   totalScore: PropTypes.number,
+  total: PropTypes.number,
 };
-ContributingCases.defaultProps = { contributions: [], totalScore: 0 };
+ContributingCases.defaultProps = { contributions: [], totalScore: 0, total: 0 };

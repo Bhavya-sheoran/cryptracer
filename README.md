@@ -180,8 +180,9 @@ the freeze approval gate, the mock NCRP feed, the STR draft, and that
 case-linked data is unreachable anonymously.
 
 ```bash
-docker compose exec backend python scripts/e2e_demo.py
-docker compose exec backend python scripts/rbac_audit.py
+docker compose exec backend python scripts/e2e_demo.py         # 42 pipeline checks
+docker compose exec backend python scripts/rbac_audit.py       # who can reach what
+docker compose exec backend python scripts/security_probe.py   # what breaks when hostile
 ```
 
 **`scripts/rbac_audit.py`** probes every endpoint three ways — anonymous, as an
@@ -189,6 +190,15 @@ investigator, as a supervisor — and fails if any is reachable more freely than
 its class allows. It tests behaviour, not declarations: a forgotten
 `Depends(get_current_user)` shows up as a 200 where a 401 belongs. It also
 checks separation of duties, token forgery, and input handling.
+
+**`scripts/security_probe.py`** asks the other question: not who may call an
+endpoint, but what it does when the request is hostile. **32/32 checks pass.**
+Forged and expired tokens, `alg=none`, an edited role claim, mass assignment of
+`status` and `approved_by`, malformed and oversized bodies, injection strings,
+path traversal in a UUID slot and in an upload filename, stack-trace leakage,
+security headers, CORS, and the login lockout — including that a correct
+password does not lift it. It cleans up the rate-limit keys it dirties, so the
+stack is usable immediately afterwards.
 
 #### The finding this pass produced
 
@@ -517,16 +527,26 @@ curl -s http://localhost:8001/api/v1/wallets/multi-reported
 ```bash
 docker compose exec backend python ml/src/download_data.py all   # once: public datasets
 docker compose exec backend python scripts/load_demo.py          # seed tags + file complaints
+docker compose exec backend python scripts/load_demo.py --reset  # ...or start from zero
 ```
 
 `load_demo.py` seeds the tag database and files all 13 synthetic complaints,
-then prints the exchange ranking. Expected output:
+then prints the exchange ranking. From a clean slate (`--reset`, or fresh
+volumes) that is:
 
 ```
-  HIGH    81.11   10 cases  TRON  Meridian Exchange
-  MEDIUM  56.54    5 cases  ETH   Northwind Digital
-  MEDIUM  48.66    4 cases  BTC   Kestrel Trade
+  MEDIUM  63.21    6 cases  TRON  Meridian Exchange
+  LOW     39.35    3 cases  ETH   Northwind Digital
+  LOW     28.35    2 cases  BTC   Kestrel Trade
 ```
+
+**These climb on every run.** Filing the same thirteen complaints again adds
+six more cases against Meridian, and the score follows — so a stack that has
+been demonstrated a few times shows High where a clean one shows Medium. That
+is the scoring working as designed, but it makes any number written down here
+wrong by the second run. `--reset` clears the case-side data (cases, wallets,
+scores, alerts, the transaction graph) while leaving the tag database and the
+demo accounts intact, which is what makes the figures above reproducible.
 
 Then analyse a single wallet end to end:
 

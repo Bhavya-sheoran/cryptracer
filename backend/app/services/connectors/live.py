@@ -17,7 +17,16 @@ from decimal import Decimal
 import httpx
 
 from app.config import get_settings
-from app.services.connectors.base import BlockchainConnector, ChainTransaction, ConnectorError, TxIO
+from app.services.connectors.base import (
+    STATUS_FAILED,
+    STATUS_SUCCESS,
+    Asset,
+    BlockchainConnector,
+    ChainTransaction,
+    ConnectorError,
+    TxIO,
+)
+from app.services.connectors.http import get_json
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -51,12 +60,7 @@ class EtherscanConnector(BlockchainConnector):
             "sort": "desc",
             "apikey": self.api_key,
         }
-        try:
-            resp = self._client.get(self.BASE_URL, params=params)
-            resp.raise_for_status()
-            payload = resp.json()
-        except httpx.HTTPError as exc:
-            raise ConnectorError(f"etherscan request failed: {exc}") from exc
+        payload = get_json(self._client, self.BASE_URL, params=params, source="etherscan")
 
         # Etherscan answers "No transactions found" with status "0" - not an error.
         if payload.get("status") != "1":
@@ -70,6 +74,10 @@ class EtherscanConnector(BlockchainConnector):
             if not tx.get("to"):  # contract creation - no recipient to trace
                 continue
             value = Decimal(tx.get("value", "0")) / Decimal(10**18)
+            # Etherscan reports a reverted transaction with isError="1" (and
+            # txreceipt_status="0" post-Byzantium). It burned gas but moved no
+            # value, so it must not become a transfer edge.
+            failed = tx.get("isError") == "1" or tx.get("txreceipt_status") == "0"
             out.append(
                 ChainTransaction(
                     chain=self.chain,
@@ -78,7 +86,8 @@ class EtherscanConnector(BlockchainConnector):
                     block_height=int(tx.get("blockNumber", 0)) or None,
                     fee=Decimal(tx.get("gasUsed", "0")) * Decimal(tx.get("gasPrice", "0"))
                     / Decimal(10**18),
-                    asset="ETH",
+                    asset=Asset.native("ETH"),
+                    status=STATUS_FAILED if failed else STATUS_SUCCESS,
                     inputs=[TxIO(address=tx["from"].lower(), value=value)],
                     outputs=[TxIO(address=tx["to"].lower(), value=value)],
                 )
@@ -104,12 +113,9 @@ class TronGridConnector(BlockchainConnector):
 
     def get_transactions(self, address: str, limit: int = 50) -> list[ChainTransaction]:
         url = f"{self.BASE_URL}/v1/accounts/{address}/transactions/trc20"
-        try:
-            resp = self._client.get(url, params={"limit": min(limit, 200)})
-            resp.raise_for_status()
-            payload = resp.json()
-        except httpx.HTTPError as exc:
-            raise ConnectorError(f"trongrid request failed: {exc}") from exc
+        payload = get_json(
+            self._client, url, params={"limit": min(limit, 200)}, source="trongrid"
+        )
 
         if not payload.get("success", True):
             raise ConnectorError(f"trongrid error: {payload.get('error', payload)}")
@@ -119,6 +125,14 @@ class TronGridConnector(BlockchainConnector):
             info = tx.get("token_info", {}) or {}
             decimals = int(info.get("decimals", 6))
             value = Decimal(str(tx.get("value", "0"))) / Decimal(10**decimals)
+            # `token_info.address` is the TRC-20 contract - the token's actual
+            # identity. Without it "USDT" is just a name anyone can claim.
+            asset = Asset(
+                chain=self.chain,
+                symbol=info.get("symbol", "TRC20"),
+                contract=info.get("address"),
+                decimals=decimals,
+            )
             out.append(
                 ChainTransaction(
                     chain=self.chain,
@@ -126,7 +140,7 @@ class TronGridConnector(BlockchainConnector):
                     timestamp=datetime.fromtimestamp(
                         int(tx["block_timestamp"]) / 1000, tz=UTC
                     ),
-                    asset=info.get("symbol", "TRC20"),
+                    asset=asset,
                     inputs=[TxIO(address=tx["from"], value=value)],
                     outputs=[TxIO(address=tx["to"], value=value)],
                 )
@@ -160,15 +174,13 @@ class BlockchairConnector(BlockchainConnector):
         return params
 
     def get_transactions(self, address: str, limit: int = 50) -> list[ChainTransaction]:
-        try:
-            resp = self._client.get(
-                f"{self.BASE_URL}/dashboards/address/{address}",
-                params=self._params(limit=min(limit, 100)),
-            )
-            resp.raise_for_status()
-            addr_data = resp.json().get("data", {}).get(address, {})
-        except httpx.HTTPError as exc:
-            raise ConnectorError(f"blockchair request failed: {exc}") from exc
+        payload = get_json(
+            self._client,
+            f"{self.BASE_URL}/dashboards/address/{address}",
+            params=self._params(limit=min(limit, 100)),
+            source="blockchair",
+        )
+        addr_data = (payload.get("data") or {}).get(address, {})
 
         txids = (addr_data or {}).get("transactions", [])[:limit]
         if not txids:
@@ -178,15 +190,13 @@ class BlockchairConnector(BlockchainConnector):
         out: list[ChainTransaction] = []
         for batch_start in range(0, len(txids), 10):
             batch = txids[batch_start : batch_start + 10]
-            try:
-                resp = self._client.get(
-                    f"{self.BASE_URL}/dashboards/transactions/{','.join(batch)}",
-                    params=self._params(),
-                )
-                resp.raise_for_status()
-                data = resp.json().get("data", {})
-            except httpx.HTTPError as exc:
-                raise ConnectorError(f"blockchair tx fetch failed: {exc}") from exc
+            batch_payload = get_json(
+                self._client,
+                f"{self.BASE_URL}/dashboards/transactions/{','.join(batch)}",
+                params=self._params(),
+                source="blockchair",
+            )
+            data = batch_payload.get("data") or {}
 
             for txid, entry in data.items():
                 tx = entry.get("transaction", {})
@@ -197,7 +207,7 @@ class BlockchairConnector(BlockchainConnector):
                         timestamp=datetime.fromisoformat(tx["time"]).replace(tzinfo=UTC),
                         block_height=tx.get("block_id"),
                         fee=Decimal(str(tx.get("fee", 0))) / self.SATS,
-                        asset="BTC",
+                        asset=Asset.native("BTC"),
                         inputs=[
                             TxIO(
                                 address=i.get("recipient", ""),

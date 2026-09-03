@@ -23,7 +23,8 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import bcrypt
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -88,9 +89,27 @@ def create_access_token(user: User) -> str:
 
 
 def decode_token(token: str) -> dict:
+    """Verify and decode a token.
+
+    `algorithms` is pinned to the one we issue, which is what stops an attacker
+    presenting `alg: none` or swapping HMAC for a public key they control.
+
+    PyJWT rather than python-jose: python-jose pulls in the pure-Python `ecdsa`
+    package, which carries a timing side-channel advisory with no fix released
+    (PYSEC-2026-1325). We only ever sign with HMAC, so that code never ran - but
+    an unfixable advisory sitting in the dependency tree costs more to explain
+    in every audit than this two-line swap cost to make.
+    """
     try:
-        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-    except JWTError as exc:
+        return jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+            # A token with no expiry would be valid forever; refuse it outright
+            # rather than trusting that we always set the claim.
+            options={"require": ["exp", "sub"]},
+        )
+    except InvalidTokenError as exc:
         raise AuthError(f"invalid token: {exc}") from exc
 
 

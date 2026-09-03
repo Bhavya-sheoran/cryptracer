@@ -286,3 +286,115 @@ def test_growing_component_does_not_leave_stale_membership(graph):
 
     assert multi == 0, "no address may belong to two clusters"
     assert orphans == 0, "emptied clusters must be pruned"
+
+
+# ---------------------------------------------------------------------------
+# Transfer value attribution
+# ---------------------------------------------------------------------------
+def test_utxo_path_volume_is_not_inflated_by_input_count(graph):
+    """Regression: summing transfer edges must equal the value actually moved.
+
+    The graph writer used to build edges from an inputs x outputs cartesian
+    product, setting the FULL output value on every pair. A 2-input, 1-output
+    transaction moving 0.369 BTC therefore summed to 0.739 - inflated by exactly
+    the input count. Any volume-based ranking built on that would systematically
+    favour consolidation-heavy Bitcoin paths.
+    """
+    graph.write_transactions(
+        [
+            tx("fund_a", [(X, 0.2)], [(A, 0.2)], minutes=0),
+            tx("fund_b", [(Y, 0.2)], [(B, 0.2)], minutes=1),
+            # 2 inputs -> 1 output: the shape that exposed the defect.
+            tx("consolidate", [(A, 0.2), (B, 0.169)], [(D, 0.369)], minutes=10),
+        ]
+    )
+
+    from app.db.neo4j import get_driver
+
+    with get_driver().session() as session:
+        row = session.run(
+            """
+            MATCH (:Address)-[tr:TRANSFERRED {txid: 'consolidate'}]->(:Address)
+            RETURN count(tr)                AS edges,
+                   sum(tr.value_attributed) AS attributed_sum
+            """
+        ).single()
+
+    assert row["edges"] == 2, "two inputs still produce two edges - that is correct"
+    # This is the number path volume must be computed from.
+    assert row["attributed_sum"] == pytest.approx(0.369, abs=1e-6)
+
+
+def test_attribution_is_proportional_to_input_contribution(graph):
+    """A larger input is credited with a larger share of the output."""
+    graph.write_transactions(
+        [
+            tx("f1", [(X, 3.0)], [(A, 3.0)], minutes=0),
+            tx("f2", [(Y, 1.0)], [(B, 1.0)], minutes=1),
+            tx("spend", [(A, 3.0), (B, 1.0)], [(D, 4.0)], minutes=10),
+        ]
+    )
+
+    from app.db.neo4j import get_driver
+
+    with get_driver().session() as session:
+        rows = {
+            r["src"]: r["attributed"]
+            for r in session.run(
+                """
+                MATCH (a:Address)-[tr:TRANSFERRED {txid: 'spend'}]->(:Address)
+                RETURN a.address_norm AS src, tr.value_attributed AS attributed
+                """
+            )
+        }
+
+    # A contributed 3 of the 4 units in, so it is credited with 3 of the 4 out.
+    assert rows[A] == pytest.approx(3.0, abs=1e-6)
+    assert rows[B] == pytest.approx(1.0, abs=1e-6)
+    assert sum(rows.values()) == pytest.approx(4.0, abs=1e-6)
+
+
+def test_account_chain_attribution_equals_raw_value(graph):
+    """One input, one output: attributed and raw must agree exactly."""
+    graph.write_transactions(
+        [tx("e1", [("0xaaa", 2.5)], [("0xbbb", 2.5)], minutes=0, chain="ETH")]
+    )
+
+    from app.db.neo4j import get_driver
+
+    with get_driver().session() as session:
+        row = session.run(
+            """
+            MATCH (:Address)-[tr:TRANSFERRED {txid: 'e1'}]->(:Address)
+            RETURN tr.value AS value, tr.value_attributed AS attributed
+            """
+        ).single()
+
+    assert row["value"] == pytest.approx(2.5)
+    assert row["attributed"] == pytest.approx(2.5)
+
+
+def test_change_back_to_spender_is_not_a_transfer(graph):
+    """An output returning to an input address is change, not a movement."""
+    graph.write_transactions(
+        [
+            tx("fund", [(X, 5.0)], [(P, 5.0)], minutes=0),
+            tx("spend_with_change", [(P, 5.0)], [(Q, 3.0), (P, 2.0)], minutes=10),
+        ]
+    )
+
+    from app.db.neo4j import get_driver
+
+    with get_driver().session() as session:
+        targets = [
+            r["dst"]
+            for r in session.run(
+                """
+                MATCH (:Address)-[:TRANSFERRED {txid: 'spend_with_change'}]->(b:Address)
+                RETURN b.address_norm AS dst
+                """
+            )
+        ]
+
+    assert Q in targets
+    assert P not in targets, "self-transfer must not become an edge"

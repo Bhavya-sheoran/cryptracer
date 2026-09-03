@@ -15,23 +15,33 @@ exported PDF, so you never have to defend the claim twice.
 docker compose up -d                                   # ~60s to healthy
 docker compose exec backend python ml/src/download_data.py all   # once, ~65 min
 docker compose exec backend python ml/src/seed_tags.py           # 3,221 public tags
-docker compose exec backend python scripts/load_demo.py          # files 13 complaints
-```
 
-Then confirm the whole pipeline is green **before** anyone is watching:
-
-```bash
+# Prove the pipeline is green while nobody is watching.
 docker compose exec backend python scripts/e2e_demo.py     # expect 42/42
+
+# Then reset, LAST, so the demo starts from exactly 13 complaints.
+docker compose exec backend python scripts/load_demo.py --reset --skip-tags
 ```
+
+**The order matters.** Every run of `load_demo.py` or `e2e_demo.py` files the
+same complaints again, so case counts and risk scores climb with each one — a
+wallet reported a hundred times reads as High simply because you rehearsed.
+`--reset` clears the case-side data (leaving the tag database and the demo
+accounts alone), so run it *after* your last verification pass, not before.
 
 Open **http://localhost:5174** and sign in as **investigator** so the first
 click of the demo is not a login form. Keep a second browser profile signed in
 as **supervisor** — you will need both for the approval step.
 
-Grab a TRON address to use throughout:
+`load_demo.py` prints the addresses to use at the end of its output. **Always
+take them from there, never from this document** - they change whenever the
+generator's parameters change, and a stale address in a demo is a dead end in
+front of an audience.
 
-```bash
-python -c "import json;d=json.load(open('ml/seeds/synthetic_dataset.json'));print([c['address'] for c in d['complaints'] if c['chain']=='TRON'][0])"
+Fastest path of all, which signs in and opens a trace in one link:
+
+```
+http://localhost:5174/?demo=investigator&address=<TRON address from load_demo>
 ```
 
 ---
@@ -69,7 +79,32 @@ Restore the TRON address and press **File complaint & trace**.
 
 ---
 
-## 3 · The money flow (90s) — *the centrepiece*
+## 3 · Service exposure (75s) — *the answer they came for*
+
+The **Service exposure** tab opens by default, because it is the answer to the
+question that was asked.
+
+> The funds did not go straight to an exchange, so the system traced them
+> onward and ranked what it found. Meridian Exchange, seven hops out, with
+> **twenty lakh rupees** arriving there.
+
+Point at the contribution bars.
+
+> And here is *why* it ranks first, not just that it does. Volume contributes
+> the most, then the label quality, then how recently the money moved. Hop
+> distance contributes least — deliberately. A dust payment to an exchange next
+> door is not a better lead than twenty lakh rupees seven hops away, and ranking
+> on proximity alone would have returned exactly that wrong answer.
+
+If you have time, run the ETH address too:
+
+> Here two services are reachable, and a **mixer outranks the exchange**. That
+> is the correct forensic call — funds entering a tumbler is the more urgent
+> finding, and it is the one an investigator needs to see first.
+
+---
+
+## 4 · The money flow (75s)
 
 The **Money flow** tab draws the Sankey.
 
@@ -89,7 +124,7 @@ Hover a ribbon (exact amount and transaction ids). Click a node to pin it.
 
 ---
 
-## 4 · Attribution (45s)
+## 5 · Attribution (45s)
 
 Open the **Attribution** tab.
 
@@ -105,12 +140,17 @@ Open the **Attribution** tab.
 
 ---
 
-## 5 · Risk, and why (60s)
+## 6 · Risk, and why (60s)
 
 Open the **Risk** tab.
 
-> High, 97 out of 100. But the number alone is worthless — here are the
-> complaints behind it.
+> Medium, sixty-three out of a hundred. But the number alone is worthless —
+> here are the complaints behind it.
+
+**Read the band and score off the screen, not off this page.** On a freshly
+reset dataset the TRON wallet scores Medium; it climbs if the demo has been
+rehearsed without `--reset`, and quoting a number the screen contradicts is the
+one mistake an audience always catches.
 
 Scroll to the contributing-cases table.
 
@@ -124,7 +164,7 @@ Scroll to the contributing-cases table.
 
 ---
 
-## 6 · Human in the loop (75s) — *the point judges remember*
+## 7 · Human in the loop (75s) — *the point judges remember*
 
 Open the **Case file** tab → **Exchange freeze request**. Write a justification,
 press **Draft freeze request**, then **Submit for approval**.
@@ -151,7 +191,7 @@ Approve it.
 
 ---
 
-## 7 · Evidence and export (45s)
+## 8 · Evidence and export (45s)
 
 Still in the case file: attach a file, then **Generate hashed PDF report**, then
 **Verify hash**.
@@ -169,7 +209,7 @@ sha256sum ~/Downloads/SIH183-*.pdf     # matches the digest on screen
 
 ---
 
-## 8 · Cross-case view (30s)
+## 9 · Cross-case view (30s)
 
 Open **Exchanges** in the left rail.
 
@@ -184,7 +224,7 @@ Open **Alerts**.
 
 ---
 
-## 9 · Close (30s)
+## 10 · Close (30s)
 
 > Built on Python/FastAPI, Neo4j with the Graph Data Science library for
 > clustering, PostgreSQL, Redis Streams and a React dashboard. The classifier
