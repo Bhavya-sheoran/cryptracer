@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 480
 
+    # Demonstration accounts with published passwords, and the endpoint that
+    # creates them. Off unless explicitly enabled, and force-disabled whenever
+    # the system is not in demo mode. See `demo_auth_enabled`.
+    allow_demo_auth: bool = False
+
     # --- Demo / honesty switch ---------------------------------------------
     # When true, blockchain connectors serve synthetic data and the UI shows a
     # permanent "SYNTHETIC DEMO DATA" banner. This flag is surfaced by
@@ -69,6 +74,14 @@ class Settings(BaseSettings):
     connector_max_attempts: int = 4
     connector_cache_ttl_seconds: int = 300
 
+    # Hard ceiling on upstream indexer calls for ONE traced address. Each
+    # expanded address costs one call, and the walk's fan-out is a property of
+    # the chain data rather than of anything we control - so without a budget a
+    # single request can spend a daily quota. 200 leaves an Etherscan free key
+    # (100k/day) good for at least 500 traces even in the worst case, while
+    # being far above what a normal trace uses (measured: 2-6 calls).
+    connector_call_budget: int = 200
+
     # --- Risk scoring -------------------------------------------------------
     risk_decay_half_life_days: int = 90
     risk_medium_threshold: float = 40.0
@@ -90,6 +103,17 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def demo_auth_enabled(self) -> bool:
+        """Whether the published demo accounts may exist.
+
+        Deliberately the AND of two switches rather than one. Turning off
+        DEMO_MODE is the act of pointing this system at real chain data, and
+        that must also close the door that lets anyone mint a supervisor -
+        even if someone forgets to unset ALLOW_DEMO_AUTH.
+        """
+        return self.allow_demo_auth and self.demo_mode
 
 
 @lru_cache

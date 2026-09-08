@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models import Case, CaseWallet, TraceRun, Wallet
-from app.services import clustering, graph_writer
+from app.services import clustering, graph_writer, illicit_model
 from app.services.chain_detect import AddressInfo, detect, normalize_address
 from app.services.connectors import get_connector
 from app.services.connectors.base import BlockchainConnector, ChainTransaction, ConnectorError
@@ -109,17 +109,42 @@ def expand_money_flow(
     collected: dict[str, ChainTransaction] = {}
     hops = 0
 
+    # One upstream call per address expanded, and nothing previously bounded
+    # how many addresses reached the next level: `max_breadth` caps
+    # transactions per address, not the fan-out those transactions produce. A
+    # wallet that spent into 25 transactions with 100 outputs each yields 2,500
+    # addresses at depth 1, and squares from there. On real data the walk stays
+    # small, but "small in the cases we tried" is not a bound - and the person
+    # who exhausts a 100,000-call daily quota does it with one click, having
+    # been given no indication that the click was expensive.
+    budget = max(1, settings.connector_call_budget)
+    calls_made = 0
+    budget_exhausted = False
+    frontier_truncated = False
+
     for depth in range(max_depth):
-        if not frontier:
+        if not frontier or budget_exhausted:
             break
         next_frontier: list[str] = []
 
         for address in frontier:
             if address in seen:
                 continue
+
+            if calls_made >= budget:
+                budget_exhausted = True
+                logger.warning(
+                    "trace of %s stopped at depth %d: upstream call budget of %d spent",
+                    root_address,
+                    depth,
+                    budget,
+                )
+                break
+
             seen.add(address)
 
             try:
+                calls_made += 1
                 txs = connector.get_transactions(address, limit=max_breadth)
             except ConnectorError as exc:
                 logger.warning("connector failed for %s at depth %d: %s", address, depth, exc)
@@ -140,12 +165,37 @@ def expand_money_flow(
 
         if next_frontier:
             hops = depth + 1
+
+        # Cap each level as well as the total. Without this a single wide hop
+        # could consume the whole budget at depth 1 and report a one-hop trace,
+        # which is the least useful shape a forensic answer can take - the
+        # money is followed further by going deeper, not by enumerating every
+        # sibling of the first hop.
+        level_cap = max_breadth * 2
+        if len(next_frontier) > level_cap:
+            logger.info(
+                "trace of %s: depth %d frontier %d addresses, capped to %d",
+                root_address,
+                depth + 1,
+                len(next_frontier),
+                level_cap,
+            )
+            next_frontier = next_frontier[:level_cap]
+            frontier_truncated = True
+
         frontier = next_frontier
 
     return {
         "transactions": list(collected.values()),
         "addresses_touched": len(seen),
         "hops_discovered": hops,
+        # Surfaced, never silent. A trace that stopped early is a materially
+        # different finding from one that ran to completion and found nothing,
+        # and an investigator has to be able to tell the two apart.
+        "upstream_calls": calls_made,
+        "budget_exhausted": budget_exhausted,
+        "frontier_truncated": frontier_truncated,
+        "complete": not (budget_exhausted or frontier_truncated),
     }
 
 
@@ -236,7 +286,18 @@ def intake_wallet(
         expansion = expand_money_flow(
             connector, info.chain, info.address_norm, depth, settings.trace_max_breadth
         )
-        write_stats = graph_writer.write_transactions(expansion["transactions"])
+        # Score before writing, while full input/output lists are still in
+        # hand. The graph keeps only counts and a fee, so scoring later would
+        # mean re-fetching from the indexer and spending an API call to
+        # re-derive something already known. Returns {} for chains with no
+        # trained model, which leaves the property null rather than zero.
+        scores = illicit_model.score_transactions(expansion["transactions"])
+        write_stats = graph_writer.write_transactions(
+            expansion["transactions"],
+            data_source=connector.source_name,
+            scores=scores,
+            model_version=illicit_model.model_info()["version"],
+        )
         graph_writer.link_case_to_address(
             case_id=str(case.id),
             case_number=case.case_number,
@@ -255,8 +316,21 @@ def intake_wallet(
         trace.mixer_interaction = detect_mixer_interaction(info.chain, touched)
         trace.hops_discovered = expansion["hops_discovered"]
         trace.addresses_touched = expansion["addresses_touched"]
+        # "complete" here means the run finished without error, which is what
+        # the trace_status_t enum models. Whether it explored the whole graph
+        # is a separate axis, carried in the response as `coverage` - a trace
+        # cut short by the call budget must not be presented as exhaustive.
         trace.status = "complete"
         trace.finished_at = datetime.now(UTC)
+        if not expansion["complete"]:
+            logger.warning(
+                "trace of %s was truncated: %d upstream calls, budget_exhausted=%s, "
+                "frontier_truncated=%s",
+                info.address_norm,
+                expansion["upstream_calls"],
+                expansion["budget_exhausted"],
+                expansion["frontier_truncated"],
+            )
 
         if run_clustering and expansion["transactions"]:
             clustering.run_clustering(info.chain)
@@ -294,6 +368,17 @@ def intake_wallet(
             "addresses_touched": trace.addresses_touched,
             "transactions_ingested": write_stats.get("transactions", 0),
             "mixer_interaction": trace.mixer_interaction,
+            "upstream_calls": expansion["upstream_calls"],
+            "complete": expansion["complete"],
+            "budget_exhausted": expansion["budget_exhausted"],
+            "frontier_truncated": expansion["frontier_truncated"],
+            "coverage_note": (
+                None
+                if expansion["complete"]
+                else "Trace stopped early to bound upstream API usage. Findings are "
+                "valid but not exhaustive; absence of a result is not evidence of "
+                "absence."
+            ),
         },
         "cluster": {
             "cluster_key": cluster.get("cluster_key"),

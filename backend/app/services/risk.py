@@ -25,10 +25,26 @@ Why this shape:
     must be able to see *which complaints* drove a High rating.
 
 The XGBoost model trained on the Elliptic dataset is a *separate* signal
-(`ml/src/train_fraud_clf.py`). It scores how illicit the traced flow looks,
-which is blended in as a modifier here rather than being the score itself -
-Elliptic labels Bitcoin transactions, not exchange culpability, and pretending
-otherwise would misrepresent what the model knows.
+(`ml/src/train_fraud_clf.py`). It contributes here as a capped advisory
+modifier, never as the score itself:
+
+  * It scores **Bitcoin transactions only**. Elliptic is a Bitcoin dataset,
+    and no comparable public labelled set exists for other chains, so
+    `tx_features` refuses them outright rather than returning a confident
+    number from constants and mismatched units.
+  * Elliptic labels transactions, not exchange culpability. A flagged
+    transaction reaching an exchange says something about the transaction, not
+    about the exchange's conduct.
+  * At its 0.95 operating point it is roughly 0.84 precision - about one flag
+    in six is wrong - so it is capped at 6 points against a saturation
+    constant of 60. It can reorder two near-equal candidates and cannot, by
+    construction, move a cluster from low to high on its own.
+  * Its contribution appears in `factors` with the model version and its
+    measured precision, so a score that includes it can still be recomputed by
+    hand from the case table plus that one line.
+
+Where a model is unavailable or the chain unsupported, the contribution is
+zero and no factor is recorded - the score is exactly what it was before.
 """
 
 from __future__ import annotations
@@ -151,6 +167,60 @@ def cases_terminating_at(
 # ---------------------------------------------------------------------------
 # Scoring
 # ---------------------------------------------------------------------------
+def flagged_transactions_for(
+    chain: str, cluster_key: str | None, entity_name: str | None
+) -> dict:
+    """Transactions reaching this cluster that the classifier flagged as illicit.
+
+    Reads the probability stamped onto each :Transaction at ingest, so this
+    costs a graph query rather than an indexer call and a re-featurisation.
+
+    Only transactions at or above the model's measured operating point are
+    counted. Everything below it is discarded rather than averaged in: the
+    0.84 precision figure that justifies using this signal at all was measured
+    at that threshold, and a mean over unfiltered probabilities would not carry
+    that guarantee.
+    """
+    from app.db.neo4j import get_driver
+    from app.services import illicit_model
+
+    if not cluster_key and not entity_name:
+        return {"flagged": 0, "scored": 0, "max_probability": None}
+
+    info = illicit_model.model_info()
+    if not info["available"]:
+        return {"flagged": 0, "scored": 0, "max_probability": None}
+
+    query = """
+    MATCH (t:Transaction {chain: $chain})-[:RECEIVED_BY]->(dest:Address)
+    WHERE t.illicit_probability IS NOT NULL
+    OPTIONAL MATCH (dest)-[:MEMBER_OF]->(cl:Cluster)
+    OPTIONAL MATCH (dest)-[:TAGGED_AS]->(e:Entity)
+    WITH DISTINCT t, cl, e
+    WHERE ($cluster_key IS NOT NULL AND cl.cluster_key = $cluster_key)
+       OR ($entity_name IS NOT NULL AND e.name = $entity_name)
+    RETURN count(t) AS scored,
+           sum(CASE WHEN t.illicit_probability >= $threshold THEN 1 ELSE 0 END) AS flagged,
+           max(t.illicit_probability) AS max_probability
+    """
+    with get_driver().session() as session:
+        row = session.run(
+            query,
+            chain=chain,
+            cluster_key=cluster_key,
+            entity_name=entity_name,
+            threshold=info["threshold"],
+        ).single()
+
+    if row is None:
+        return {"flagged": 0, "scored": 0, "max_probability": None}
+    return {
+        "flagged": int(row["flagged"] or 0),
+        "scored": int(row["scored"] or 0),
+        "max_probability": row["max_probability"],
+    }
+
+
 def score_entity(
     db: Session,
     chain: str,
@@ -219,6 +289,26 @@ def score_entity(
     if entity_type == "sanctioned":
         raw_points += SANCTIONED_BONUS
         factors.append("destination is on the OFAC SDN list")
+
+    # The classifier, applied as an advisory nudge and nothing more. At its
+    # 0.95 operating point the model is ~0.84 precision, so about one flag in
+    # six is wrong - which is useful for ordering two otherwise-equal
+    # candidates and useless for deciding one on its own. The cap (6 points
+    # against a saturation constant of 60) keeps complaint evidence dominant.
+    from app.services import illicit_model
+
+    ml_signal = flagged_transactions_for(chain, cluster_key, entity_name)
+    ml_points = float(illicit_model.risk_contribution(ml_signal["flagged"]))
+    if ml_points > 0:
+        info = illicit_model.model_info()
+        raw_points += ml_points
+        precision = info["precision_at_threshold"]
+        factors.append(
+            f"{ml_signal['flagged']} of {ml_signal['scored']} scored transaction(s) "
+            f"flagged by the Elliptic classifier at p>={info['threshold']:.2f} "
+            f"(model {info['version']}, ~{precision:.2f} precision; advisory, "
+            f"capped at {info['max_risk_contribution']} points)"
+        )
 
     score = _squash(raw_points)
     label = label_for(score)

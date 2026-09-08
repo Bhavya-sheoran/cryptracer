@@ -28,9 +28,22 @@ which scikit-learn removed in 1.9, so the wrapper raises on save. The native API
 touches none of that, and the JSON model it writes loads across xgboost 2.x and
 3.x alike, so the artifact does not silently break when the image is rebuilt.
 
+Two models come out of this file, and the distinction matters:
+
+  * **Default (182 features)** - the benchmark. Validated, citable, and
+    impossible to serve: 165 of its features are anonymised z-scores whose
+    definitions Elliptic never published, so they cannot be computed for a live
+    transaction.
+  * **`--servable` (17 features)** - trained only on the human-readable columns
+    that are reproducible from raw chain data. Weaker, and the one that can
+    actually score a transaction the system traced itself.
+
+They are written to separate artifacts. Never overwrite one with the other.
+
 Usage:
     python ml/src/train_fraud_clf.py
     python ml/src/train_fraud_clf.py --split-time-step 34
+    python ml/src/train_fraud_clf.py --servable
 """
 
 from __future__ import annotations
@@ -61,6 +74,25 @@ ARTIFACTS = REPO / "ml" / "artifacts"
 LABEL_ILLICIT = 1
 DEFAULT_SPLIT_STEP = 34
 MODEL_VERSION = "elliptic-xgb-v1"
+SERVABLE_MODEL_VERSION = "elliptic-xgb-servable-v1"
+
+# The 17 Elliptic features that are human-readable and reproducible from raw
+# chain data. The other 165 (Local_feature_N, Aggregate_feature_N) are
+# anonymised z-scores whose definitions Elliptic never published - they cannot
+# be computed for a live transaction, which is why a model using them can be
+# validated but never served.
+SERVABLE_FEATURES = [
+    "in_txs_degree", "out_txs_degree", "total_BTC", "fees", "size",
+    "num_input_addresses", "num_output_addresses",
+    "in_BTC_min", "in_BTC_max", "in_BTC_mean", "in_BTC_median", "in_BTC_total",
+    "out_BTC_min", "out_BTC_max", "out_BTC_mean", "out_BTC_median", "out_BTC_total",
+]
+
+# Thresholds reported in the servable artifact so the serving code can read its
+# operating point from the same file that evidences it.
+SERVING_THRESHOLDS = (0.5, 0.7, 0.8, 0.9, 0.95, 0.98)
+SERVING_THRESHOLD = 0.95
+SERVING_MAX_RISK_CONTRIBUTION = 6.0
 
 
 def load_data(path: Path = DATA) -> pd.DataFrame:
@@ -73,9 +105,20 @@ def load_data(path: Path = DATA) -> pd.DataFrame:
     return df
 
 
-def prepare(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series, list[str]]:
+def prepare(
+    df: pd.DataFrame, servable: bool = False
+) -> tuple[pd.DataFrame, pd.Series, pd.Series, list[str]]:
     time_col = "Time step" if "Time step" in df.columns else df.columns[1]
     feature_cols = [c for c in df.columns if c not in ("txId", time_col, "label")]
+
+    if servable:
+        # Fail loudly rather than quietly training on whatever survived. If the
+        # upstream mirror renames a column, a model trained on 14 features would
+        # still save and still load - and be wrong in a way nothing catches.
+        missing = [c for c in SERVABLE_FEATURES if c not in df.columns]
+        if missing:
+            raise SystemExit(f"servable columns absent from the dataset: {missing}")
+        feature_cols = list(SERVABLE_FEATURES)
 
     x = df[feature_cols].apply(pd.to_numeric, errors="coerce").fillna(0.0)
     y = (df["label"].astype(int) == LABEL_ILLICIT).astype(int)
@@ -83,10 +126,12 @@ def prepare(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series, list[
     return x, y, steps, feature_cols
 
 
-def train(split_step: int = DEFAULT_SPLIT_STEP) -> dict:
+def train(split_step: int = DEFAULT_SPLIT_STEP, servable: bool = False) -> dict:
     print(f"loading {DATA} ...", flush=True)
     df = load_data()
-    x, y, steps, feature_cols = prepare(df)
+    x, y, steps, feature_cols = prepare(df, servable=servable)
+    if servable:
+        print(f"SERVABLE MODE: restricted to {len(feature_cols)} reproducible features")
 
     train_mask = steps <= split_step
     test_mask = ~train_mask
@@ -145,7 +190,7 @@ def train(split_step: int = DEFAULT_SPLIT_STEP) -> dict:
 
     tn, fp, fn, tp = confusion_matrix(y_test, pred).ravel()
     report = {
-        "model_version": MODEL_VERSION,
+        "model_version": SERVABLE_MODEL_VERSION if servable else MODEL_VERSION,
         "algorithm": "xgboost.train (native Booster API)",
         "xgboost_version": xgb.__version__,
         "dataset": "Elliptic Bitcoin Dataset (public; Elliptic++ mirror)",
@@ -180,27 +225,78 @@ def train(split_step: int = DEFAULT_SPLIT_STEP) -> dict:
         for name, gain in sorted(gains.items(), key=lambda kv: kv[1], reverse=True)[:15]
     ]
 
+    # The servable model is dangerous at the default 0.5 threshold, so the
+    # artifact carries its own operating point and the sweep that justifies it.
+    # Serving code reads the threshold from here rather than hardcoding one,
+    # which keeps the number that governs behaviour and the evidence for it in
+    # the same file - they cannot drift apart.
+    if servable:
+        report["serving_guidance"] = {
+            "decision_threshold": SERVING_THRESHOLD,
+            "reason": (
+                "At the default 0.5 this model is roughly 0.53 precision - about "
+                "every second flag would be wrong, which is indefensible for a "
+                "signal contributing to a freeze recommendation. At 0.95, "
+                "precision recovers to roughly 0.86 while recall falls to about "
+                "0.21. For an advisory modifier, being right when it speaks "
+                "matters far more than speaking often."
+            ),
+            "max_risk_contribution": SERVING_MAX_RISK_CONTRIBUTION,
+            "threshold_sweep": [
+                {
+                    "threshold": t,
+                    "flagged": int((proba >= t).sum()),
+                    "precision": round(
+                        float(precision_score(y_test, (proba >= t).astype(int),
+                                              zero_division=0)), 4
+                    ),
+                    "recall": round(
+                        float(recall_score(y_test, (proba >= t).astype(int),
+                                           zero_division=0)), 4
+                    ),
+                }
+                for t in SERVING_THRESHOLDS
+            ],
+        }
+
+    suffix = "_servable" if servable else ""
+    model_path = ARTIFACTS / f"fraud_clf{suffix}.json"
+    columns_path = ARTIFACTS / f"feature_columns{suffix}.json"
+    metrics_path = ARTIFACTS / f"metrics{suffix}.json"
+
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
-    model_path = ARTIFACTS / "fraud_clf.json"
     booster.save_model(str(model_path))
     report["model_path"] = str(model_path.relative_to(REPO))
-    (ARTIFACTS / "feature_columns.json").write_text(
-        json.dumps(feature_cols, indent=0), encoding="utf-8"
-    )
-    (ARTIFACTS / "metrics.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    columns_path.write_text(json.dumps(feature_cols, indent=0), encoding="utf-8")
+    metrics_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     print("\n--- held-out results (temporal split) ---")
     print(classification_report(y_test, pred, target_names=["licit", "illicit"], digits=4))
     print(json.dumps(metrics, indent=2))
-    print(f"\nwrote {ARTIFACTS / 'metrics.json'}")
+    if servable:
+        print("\n--- threshold sweep (serve at 0.95, not 0.5) ---")
+        for row in report["serving_guidance"]["threshold_sweep"]:
+            print(
+                f"  {row['threshold']:.2f}  flagged={row['flagged']:>5}  "
+                f"precision={row['precision']:.4f}  recall={row['recall']:.4f}"
+            )
+    print(f"\nwrote {metrics_path}")
     return report
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--split-time-step", type=int, default=DEFAULT_SPLIT_STEP)
+    ap.add_argument(
+        "--servable",
+        action="store_true",
+        help=(
+            "train on the 17 reproducible features only - the model that can "
+            "actually score a live transaction. Writes *_servable artifacts."
+        ),
+    )
     args = ap.parse_args()
-    train(args.split_time_step)
+    train(args.split_time_step, servable=args.servable)
     return 0
 
 

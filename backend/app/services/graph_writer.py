@@ -21,7 +21,7 @@ from collections.abc import Iterable
 from decimal import Decimal
 
 from app.db.neo4j import get_driver
-from app.services.connectors.base import ChainTransaction
+from app.services.connectors.base import SOURCE_UNKNOWN, ChainTransaction
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,17 @@ MERGE (t:Transaction {chain: tx.chain, txid: tx.txid})
   SET         t.asset_key = tx.asset_key,
               t.token_contract = tx.token_contract,
               t.transfer_type = tx.transfer_type,
-              t.status = tx.status
+              t.status = tx.status,
+              // Provenance, stamped from the connector that fetched this
+              // record. Read back at query time so a response reports where
+              // its data actually came from rather than how DEMO_MODE happens
+              // to be set when someone asks.
+              t.data_source = tx.data_source,
+              // Illicit-likelihood from the Elliptic-trained classifier, or
+              // null where it could not be scored (unsupported chain, or no
+              // model artifact). Null, not zero: zero would assert innocence.
+              t.illicit_probability = tx.illicit_probability,
+              t.illicit_model_version = tx.illicit_model_version
 
 // --- inputs -------------------------------------------------------------
 WITH t, tx
@@ -54,7 +64,13 @@ CALL (t, tx) {
   SET a.first_seen = CASE WHEN a.first_seen > datetime(tx.timestamp)
                           THEN datetime(tx.timestamp) ELSE a.first_seen END,
       a.last_seen  = CASE WHEN a.last_seen  < datetime(tx.timestamp)
-                          THEN datetime(tx.timestamp) ELSE a.last_seen END
+                          THEN datetime(tx.timestamp) ELSE a.last_seen END,
+      // A list, not a scalar: the same address can legitimately be observed
+      // by more than one source, and collapsing that to one value would
+      // silently discard the fact that part of its history is synthetic.
+      a.data_sources = CASE
+        WHEN tx.data_source IN coalesce(a.data_sources, []) THEN a.data_sources
+        ELSE coalesce(a.data_sources, []) + tx.data_source END
   MERGE (a)-[s:SENT {vin_index: inp.index}]->(t)
     ON CREATE SET s.value = inp.value
   RETURN count(*) AS _in
@@ -72,7 +88,10 @@ CALL (t, tx) {
   SET b.first_seen = CASE WHEN b.first_seen > datetime(tx.timestamp)
                           THEN datetime(tx.timestamp) ELSE b.first_seen END,
       b.last_seen  = CASE WHEN b.last_seen  < datetime(tx.timestamp)
-                          THEN datetime(tx.timestamp) ELSE b.last_seen END
+                          THEN datetime(tx.timestamp) ELSE b.last_seen END,
+      b.data_sources = CASE
+        WHEN tx.data_source IN coalesce(b.data_sources, []) THEN b.data_sources
+        ELSE coalesce(b.data_sources, []) + tx.data_source END
   MERGE (t)-[r:RECEIVED_BY {vout_index: outp.index}]->(b)
     ON CREATE SET r.value = outp.value
   SET r.is_change = outp.is_change
@@ -95,7 +114,11 @@ MERGE (a)-[tr:TRANSFERRED {txid: tx.txid}]->(b)
       tr.asset            = tx.asset,
       tr.asset_key        = tx.asset_key,
       tr.token_contract   = tx.token_contract,
-      tr.transfer_type    = tx.transfer_type
+      tr.transfer_type    = tx.transfer_type,
+      // Stamped on the transfer edge too, because tracing walks these edges
+      // and the answer to "is this path synthetic" has to be derivable from
+      // the exact edges the trace crossed.
+      tr.data_source      = tx.data_source
 RETURN count(*) AS edges
 """
 
@@ -200,10 +223,22 @@ def _transfer_pairs(tx: ChainTransaction) -> list[dict]:
     return pairs
 
 
-def _tx_to_params(tx: ChainTransaction) -> dict:
+def _tx_to_params(
+    tx: ChainTransaction,
+    data_source: str,
+    scores: dict[str, float] | None = None,
+    model_version: str | None = None,
+) -> dict:
+    probability = (scores or {}).get(tx.txid)
     return {
         "chain": tx.chain,
         "txid": tx.txid,
+        "data_source": data_source,
+        "illicit_probability": probability,
+        # Recorded alongside, so a stored score can always be traced back to
+        # the artifact that produced it. A probability whose model is unknown
+        # cannot be re-derived, defended, or invalidated when the model changes.
+        "illicit_model_version": model_version if probability is not None else None,
         "timestamp": tx.timestamp.isoformat(),
         "block_height": tx.block_height,
         "fee": float(tx.fee),
@@ -237,8 +272,21 @@ def _tx_to_params(tx: ChainTransaction) -> dict:
     }
 
 
-def write_transactions(transactions: Iterable[ChainTransaction], batch_size: int = 100) -> dict:
-    """Write transactions into the graph. Idempotent."""
+def write_transactions(
+    transactions: Iterable[ChainTransaction],
+    batch_size: int = 100,
+    data_source: str = SOURCE_UNKNOWN,
+    scores: dict[str, float] | None = None,
+    model_version: str | None = None,
+) -> dict:
+    """Write transactions into the graph. Idempotent.
+
+    `data_source` is the `source_name` of the connector that fetched these
+    records, and it is stamped onto every node and transfer edge written here.
+    It defaults to "unknown" rather than to the current DEMO_MODE: a caller
+    that does not say where its data came from must not have that gap filled in
+    with a guess, because the guess would be indistinguishable from a fact.
+    """
     txs = list(transactions)
     if not txs:
         return {"transactions": 0, "edges": 0}
@@ -247,7 +295,10 @@ def write_transactions(transactions: Iterable[ChainTransaction], batch_size: int
     driver = get_driver()
     with driver.session() as session:
         for start in range(0, len(txs), batch_size):
-            batch = [_tx_to_params(t) for t in txs[start : start + batch_size]]
+            batch = [
+                _tx_to_params(t, data_source, scores, model_version)
+                for t in txs[start : start + batch_size]
+            ]
             record = session.run(_MERGE_TX, txs=batch).single()
             total_edges += record["edges"] if record else 0
 

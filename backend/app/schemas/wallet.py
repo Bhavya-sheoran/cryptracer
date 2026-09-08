@@ -58,6 +58,16 @@ class TraceSummary(BaseModel):
     transactions_ingested: int
     mixer_interaction: bool
 
+    # How much of the reachable graph was actually walked. `status` says the
+    # run did not error; these say whether it ran out of budget first. An
+    # investigator reading "no exchange found" needs to distinguish "none
+    # within 8 hops" from "we stopped looking".
+    upstream_calls: int = 0
+    complete: bool = True
+    budget_exhausted: bool = False
+    frontier_truncated: bool = False
+    coverage_note: str | None = None
+
 
 class ClusterSummary(BaseModel):
     cluster_key: str | None = None

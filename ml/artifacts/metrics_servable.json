@@ -1,0 +1,135 @@
+{
+  "model_version": "elliptic-xgb-servable-v1",
+  "algorithm": "xgboost.train (native Booster API)",
+  "xgboost_version": "3.2.0",
+  "dataset": "Elliptic Bitcoin Dataset (public; Elliptic++ mirror)",
+  "validation_protocol": "temporal split - train on Time step <= 34, test on Time step > 34. No random shuffling: transactions within a time step are correlated, so a random split would leak future information and inflate these numbers.",
+  "rows_total": 46564,
+  "features": 17,
+  "train_rows": 29894,
+  "train_illicit": 3462,
+  "test_rows": 16670,
+  "test_illicit": 1083,
+  "scale_pos_weight": 7.635,
+  "num_boost_round": 400,
+  "train_seconds": 2.0,
+  "metrics_heldout": {
+    "precision_illicit": 0.5077,
+    "recall_illicit": 0.4589,
+    "f1_illicit": 0.4821,
+    "roc_auc": 0.8591,
+    "average_precision": 0.475
+  },
+  "confusion_matrix_heldout": {
+    "true_negative": 15105,
+    "false_positive": 482,
+    "false_negative": 586,
+    "true_positive": 497
+  },
+  "top_features": [
+    {
+      "feature": "num_output_addresses",
+      "gain": 197.7959
+    },
+    {
+      "feature": "size",
+      "gain": 105.0985
+    },
+    {
+      "feature": "num_input_addresses",
+      "gain": 50.9132
+    },
+    {
+      "feature": "fees",
+      "gain": 28.2653
+    },
+    {
+      "feature": "in_BTC_min",
+      "gain": 11.068
+    },
+    {
+      "feature": "out_BTC_min",
+      "gain": 10.9076
+    },
+    {
+      "feature": "in_BTC_total",
+      "gain": 10.3293
+    },
+    {
+      "feature": "in_BTC_mean",
+      "gain": 8.8002
+    },
+    {
+      "feature": "out_BTC_median",
+      "gain": 8.3764
+    },
+    {
+      "feature": "out_BTC_total",
+      "gain": 7.5042
+    },
+    {
+      "feature": "out_BTC_mean",
+      "gain": 7.462
+    },
+    {
+      "feature": "in_txs_degree",
+      "gain": 7.4024
+    },
+    {
+      "feature": "in_BTC_median",
+      "gain": 7.0579
+    },
+    {
+      "feature": "total_BTC",
+      "gain": 6.9226
+    },
+    {
+      "feature": "out_BTC_max",
+      "gain": 6.4962
+    }
+  ],
+  "serving_guidance": {
+    "decision_threshold": 0.95,
+    "reason": "At the default 0.5 this model is roughly 0.53 precision - about every second flag would be wrong, which is indefensible for a signal contributing to a freeze recommendation. At 0.95, precision recovers to roughly 0.86 while recall falls to about 0.21. For an advisory modifier, being right when it speaks matters far more than speaking often.",
+    "max_risk_contribution": 6.0,
+    "threshold_sweep": [
+      {
+        "threshold": 0.5,
+        "flagged": 979,
+        "precision": 0.5077,
+        "recall": 0.4589
+      },
+      {
+        "threshold": 0.7,
+        "flagged": 712,
+        "precision": 0.6053,
+        "recall": 0.398
+      },
+      {
+        "threshold": 0.8,
+        "flagged": 589,
+        "precision": 0.6384,
+        "recall": 0.3472
+      },
+      {
+        "threshold": 0.9,
+        "flagged": 405,
+        "precision": 0.7605,
+        "recall": 0.2844
+      },
+      {
+        "threshold": 0.95,
+        "flagged": 291,
+        "precision": 0.8419,
+        "recall": 0.2262
+      },
+      {
+        "threshold": 0.98,
+        "flagged": 203,
+        "precision": 0.8818,
+        "recall": 0.1653
+      }
+    ]
+  },
+  "model_path": "ml/artifacts/fraud_clf_servable.json"
+}
