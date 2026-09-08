@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from app.db.neo4j import get_driver
+from app.services.connectors.base import SOURCE_SYNTHETIC
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,8 @@ RETURN dest.address_norm AS address,
        [n IN nodes(p) | n.address_norm] AS path,
        [r IN relationships(p) | {
           txid: r.txid, value: r.value,
-          timestamp: toString(r.timestamp), asset: r.asset
+          timestamp: toString(r.timestamp), asset: r.asset,
+          data_source: coalesce(r.data_source, 'unknown')
        }] AS transfers,
        e.name        AS entity_name,
        e.entity_type AS entity_type,
@@ -108,6 +110,18 @@ def trace_path(chain: str, address_norm: str, depth: int = 6, max_nodes: int = 3
                     "asset": transfer.get("asset"),
                 }
 
+    # Provenance of the edges this trace actually crossed, read off the edges
+    # rather than inferred from DEMO_MODE. A path that touches even one
+    # synthetic edge is not a live-data finding, and the caller has to be able
+    # to see that without trusting a global flag.
+    edge_sources = sorted(
+        {
+            transfer.get("data_source") or "unknown"
+            for r in rows
+            for transfer in (r["transfers"] or [])
+        }
+    )
+
     return {
         "root": address_norm,
         "chain": chain,
@@ -127,6 +141,9 @@ def trace_path(chain: str, address_norm: str, depth: int = 6, max_nodes: int = 3
         "node_count": len(nodes),
         "link_count": len(links),
         "truncated": len(rows) >= max_nodes,
+        "edge_sources": edge_sources,
+        "contains_synthetic": SOURCE_SYNTHETIC in edge_sources,
+        "provenance_complete": "unknown" not in edge_sources,
     }
 
 

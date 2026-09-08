@@ -40,6 +40,31 @@ settings = get_settings()
 MAX_LISTED_CASES = 50
 
 
+def _provenance_of(path: dict) -> str:
+    """Describe where the traced data actually came from.
+
+    Reported from the edges the trace crossed, so the claim is a property of
+    the evidence rather than of a configuration flag. The rules are
+    deliberately pessimistic:
+
+      * any synthetic edge makes the whole finding synthetic - a path is only
+        as trustworthy as its weakest link, and "mostly real" is not a
+        category an investigator can act on;
+      * any edge whose origin was never stamped reports as unverified rather
+        than being assumed live. Records written before provenance stamping
+        existed fall in here, and an unknown origin must never be upgraded to
+        a claim of live data.
+    """
+    sources = path.get("edge_sources") or []
+    if not sources:
+        return "no_traced_edges"
+    if path.get("contains_synthetic"):
+        return "synthetic" if len(sources) == 1 else "mixed_contains_synthetic"
+    if not path.get("provenance_complete", True):
+        return "unverified"
+    return "live_indexer_apis"
+
+
 @router.get("/wallet", response_model=WalletAnalysisResponse)
 def analyse_wallet(
     address: str = Query(..., description="Suspect wallet address"),
@@ -174,7 +199,12 @@ def analyse_wallet(
         reported_in_cases=reported_in,
         reported_in_cases_total=reported_in_total,
         listing_limit=MAX_LISTED_CASES,
-        data_provenance="synthetic" if settings.demo_mode else "live_indexer_apis",
+        # Derived from the edges this trace actually crossed, never from
+        # DEMO_MODE. The setting says how the system is configured now; it says
+        # nothing about where records already in the graph came from, and
+        # reporting one as the other is how a synthetic path ends up presented
+        # as a live-data finding.
+        data_provenance=_provenance_of(path),
         notice=(
             "Recommendation only. Any freeze or disclosure request requires explicit "
             "approval by an authorised officer. Demonstration system built on synthetic "

@@ -130,6 +130,16 @@ class ChainTransaction:
         return sum((o.value for o in self.outputs), Decimal(0))
 
 
+# Provenance vocabulary. Written onto every graph record so the origin of a
+# traced path can be established from the data itself.
+SOURCE_SYNTHETIC = "synthetic"
+SOURCE_UNKNOWN = "unknown"
+
+#: Records written before provenance stamping existed. Treated as untrusted:
+#: a record whose origin cannot be established must never be presented as live.
+LEGACY_UNSTAMPED = SOURCE_UNKNOWN
+
+
 class ConnectorError(RuntimeError):
     """Raised when an upstream indexer fails or is misconfigured."""
 
@@ -141,6 +151,19 @@ class BlockchainConnector(ABC):
     chain: str = ""
     #: recorded on trace_runs.data_source so provenance is always auditable
     source_name: str = ""
+
+    @property
+    def is_synthetic(self) -> bool:
+        """Whether this connector invents its data.
+
+        Provenance has to come from whatever actually fetched a record, not
+        from reading DEMO_MODE at query time. The setting describes how the
+        system is configured *now*; a record that was written last week under a
+        different setting does not change its origin because a flag flipped.
+        Conflating the two is how a trace ends up crossing synthetic edges
+        while the response, the banner and the exported PDF all claim live data.
+        """
+        return self.source_name == SOURCE_SYNTHETIC
 
     @abstractmethod
     def get_transactions(self, address: str, limit: int = 50) -> list[ChainTransaction]:
