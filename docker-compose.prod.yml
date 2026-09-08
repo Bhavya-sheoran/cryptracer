@@ -1,0 +1,51 @@
+# Production overlay. Apply on top of the base file:
+#
+#     docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# What it changes, and why each one is not simply the default:
+#
+#   * Closes every plaintext and datastore port. The base file keeps them for
+#     development, bound to loopback. Here they are removed entirely, so the
+#     only way in is Caddy on 8443. An open http port beside an https one makes
+#     the encryption optional in practice - an attacker just asks for the other
+#     port, and the tokens they want travel in the clear.
+#   * Turns off the demonstration accounts explicitly. They are already
+#     force-disabled whenever DEMO_MODE is false, but stating it here means the
+#     production configuration does not depend on a second setting being right.
+#   * Drops the source bind mounts and the reload flag. A container that runs
+#     code from the host is a container whose behaviour is whatever is on that
+#     host's disk at the time.
+#
+# Still required before this is genuinely production-ready: a real retention
+# policy, backups, CI, and the Postgres password rotation. See the readiness
+# roadmap - this file closes the network surface, not the whole tier.
+
+services:
+  postgres:
+    ports: !override []
+
+  neo4j:
+    ports: !override []
+
+  redis:
+    ports: !override []
+
+  backend:
+    ports: !override []
+    environment:
+      DEMO_MODE: "false"
+      ALLOW_DEMO_AUTH: "false"
+    # Read-only source, baked into the image at build time rather than mounted
+    # from the host. Storage stays writable - it holds evidence and reports.
+    volumes: !override
+      - ./ml/artifacts:/app/ml_artifacts:ro
+      - backendstorage:/app/storage
+    command:
+      ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+
+  frontend:
+    ports: !override []
+
+  caddy:
+    ports:
+      - "${HTTPS_PORT:-8443}:8443"

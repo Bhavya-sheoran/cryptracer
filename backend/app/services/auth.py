@@ -173,6 +173,18 @@ def seed_demo_users(db: Session) -> list[str]:
             select(User).where(User.username == spec["username"])
         ).scalar_one_or_none()
         if existing is not None:
+            # Re-enable one that was deactivated. "Seed the demo accounts" has
+            # to mean "make them usable", not "create rows if absent" - a
+            # disabled account satisfies the second and fails the first, which
+            # left the test suite unable to sign in after the real deployment
+            # steps disabled them.
+            #
+            # Safe because the only caller is gated on demo_auth_enabled, which
+            # requires DEMO_MODE. A live deployment never reaches this line, so
+            # deactivated demo accounts stay deactivated there.
+            if not existing.is_active:
+                existing.is_active = True
+                created.append(f"{spec['username']} (re-enabled)")
             continue
         db.add(
             User(

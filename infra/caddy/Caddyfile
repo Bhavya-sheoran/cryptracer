@@ -1,0 +1,41 @@
+# TLS front door for the local stack.
+#
+# Everything is served from ONE origin. That is the point: the dashboard calls
+# /api/v1/... as a relative path, so there is no cross-origin request to
+# permit, no CORS preflight, and no way for a misconfigured allow-list to
+# either block the app or open it to somebody else. The WebSocket rides the
+# same origin and inherits wss:// automatically.
+#
+# `tls internal` issues a certificate from Caddy's own local CA. Your browser
+# will not trust it until you install that CA - see docs/tls.md. That warning
+# is expected and is not a defect.
+{
+	# No admin API. It is unauthenticated by default and would be reachable
+	# from any other container on the compose network.
+	admin off
+	# Caddy would otherwise bind :80 to redirect, which this stack does not use.
+	auto_https disable_redirects
+}
+
+localhost:8443, 127.0.0.1:8443 {
+	tls internal
+
+	encode gzip
+
+	# Caddy terminates TLS, so the backend sees plain http and correctly
+	# declines to emit HSTS itself. Set it here, where the connection really
+	# is https. max-age is deliberately short for a local deployment: pinning
+	# localhost to https for a year would break every other project you run.
+	header Strict-Transport-Security "max-age=3600"
+
+	# The API, its docs, and the alert socket.
+	@backend path /api/* /docs /docs/* /openapi.json /redoc /redoc/*
+	handle @backend {
+		reverse_proxy backend:8000
+	}
+
+	# Everything else is the dashboard, including Vite's own HMR socket.
+	handle {
+		reverse_proxy frontend:5173
+	}
+}

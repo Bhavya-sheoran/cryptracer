@@ -7,12 +7,14 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db.postgres import get_db
 from app.deps import get_current_user
 from app.models import User
 from app.services.auth import AuthError, authenticate, create_access_token, seed_demo_users
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+settings = get_settings()
 
 
 class TokenResponse(BaseModel):
@@ -68,7 +70,15 @@ def seed(db: Session = Depends(get_db)):
 
     Published credentials for a demo only - see app/services/auth.py. Not a
     security model for any real deployment.
+
+    Gated on `demo_auth_enabled`, which requires ALLOW_DEMO_AUTH *and*
+    DEMO_MODE. Disabled it answers 404 rather than 403: a 403 confirms the
+    endpoint exists and is worth attacking, while a 404 is indistinguishable
+    from a build that never had it.
     """
+    if not settings.demo_auth_enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not Found")
+
     created = seed_demo_users(db)
     return {
         "created": created,

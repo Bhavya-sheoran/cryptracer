@@ -47,5 +47,8 @@ def ready() -> dict:
         # Consumed by the frontend banner. Never claim live-chain provenance
         # while demo_mode is on.
         "data_source": "synthetic" if settings.demo_mode else "live_indexer_apis",
+        # The dashboard hides the published-credential panel when this is
+        # false, so the UI cannot offer a sign-in route the server refuses.
+        "demo_auth_enabled": settings.demo_auth_enabled,
         "phase": "4 - case management, NCRP mock, STR, freeze workflow, alerts",
     }

@@ -87,8 +87,10 @@ export default function App() {
   //
   // This uses exactly the endpoints the "Sign in as <role>" buttons already
   // call, with the credentials already published in the sign-in panel - it
-  // opens no door that is not already open. It must be removed alongside the
-  // demo accounts and /auth/seed-demo-users before any real deployment.
+  // opens no door that is not already open. It needs no separate removal: the
+  // server gates /auth/seed-demo-users on ALLOW_DEMO_AUTH and DEMO_MODE, so
+  // where demo accounts are disabled this path 404s and falls through signed
+  // out, exactly as it does when the credentials are wrong.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const deepAddress = params.get('address');
@@ -239,7 +241,12 @@ export default function App() {
               </section>
             ) : null}
 
-            {!user ? <SignIn onSignedIn={setUser} /> : null}
+            {!user ? (
+              <SignIn
+                onSignedIn={setUser}
+                demoAuthEnabled={Boolean(readiness?.demo_auth_enabled)}
+              />
+            ) : null}
 
             {view === 'investigate' ? (
               <Investigate currentUser={user} submitted={submitted} />

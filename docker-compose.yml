@@ -30,6 +30,11 @@ services:
   neo4j:
     image: neo4j:5.26-community
     container_name: sih183-neo4j
+    # The official image runs its server as root by default. Its own `neo4j`
+    # user (7474) already owns /data and /logs, so pinning it here costs
+    # nothing and means a compromise of the database process is not a
+    # compromise of root.
+    user: "7474:7474"
     environment:
       NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-sihdevpass}
       NEO4J_PLUGINS: '["graph-data-science","apoc"]'
@@ -92,6 +97,11 @@ services:
       # worst possible outcome for a security knob.
       JWT_SECRET: ${JWT_SECRET:-insecure-demo-secret-replace-before-any-real-deployment}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-480}
+      # This compose file IS the demo stack, so the published demo accounts
+      # default on here. They are still force-disabled the moment DEMO_MODE is
+      # false, and the setting itself defaults to false in app/config.py - so a
+      # deployment that does not use this file gets the safe behaviour.
+      ALLOW_DEMO_AUTH: ${ALLOW_DEMO_AUTH:-true}
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-240}
       RATE_LIMIT_AUTH_FAILURES: ${RATE_LIMIT_AUTH_FAILURES:-8}
@@ -113,7 +123,11 @@ services:
       WATCHFILES_FORCE_POLLING: "true"
       CORS_ORIGINS: http://localhost:${FRONTEND_PORT:-5174}
     ports:
-      - "${BACKEND_PORT:-8001}:8000"
+      # Bound to the loopback interface, not 0.0.0.0. This is the plaintext
+      # route: reachable for local development and for scripts/, but not from
+      # the network, so it cannot be used to sidestep Caddy's TLS from another
+      # machine. Removed entirely by docker-compose.prod.yml.
+      - "127.0.0.1:${BACKEND_PORT:-8001}:8000"
     volumes:
       - ./backend:/app
       - ./ml/artifacts:/app/ml_artifacts:ro
@@ -145,16 +159,52 @@ services:
       context: ./frontend
     container_name: sih183-frontend
     environment:
-      VITE_API_BASE: http://localhost:${BACKEND_PORT:-8001}
-      VITE_WS_URL: ws://localhost:${BACKEND_PORT:-8001}/api/v1/ws/alerts
+      # Empty means same-origin: the dashboard calls /api/v1/... relatively.
+      # Direct access on 5174 works because Vite proxies /api to the backend
+      # (see vite.config.js); access through Caddy on 8443 works because Caddy
+      # does. One code path, no CORS either way, and https is inherited rather
+      # than hardcoded.
+      VITE_API_BASE: ""
+      VITE_WS_URL: ""
     ports:
-      - "${FRONTEND_PORT:-5174}:5173"
+      - "127.0.0.1:${FRONTEND_PORT:-5174}:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
       - backend
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+
+  # TLS front door. Serves the dashboard and the API from one https origin, so
+  # tokens and complaint data never cross the wire in cleartext.
+  #
+  # The direct http ports on backend and frontend above are kept for local
+  # development convenience. A real deployment removes them and publishes only
+  # this service - otherwise the plaintext route is still open beside the
+  # encrypted one, which makes the encryption optional in practice.
+  caddy:
+    image: caddy:2-alpine
+    container_name: sih183-caddy
+    restart: unless-stopped
+    # Non-root, like the other services we control. Nothing here needs
+    # privilege: 8443 is above the reserved range, and the local CA lives in
+    # the caddydata volume, which is chowned to this uid below.
+    user: "1000:1000"
+    # Every capability dropped except the one the caddy binary carries as a
+    # file capability. Dropping that too makes exec itself fail with EPERM -
+    # the kernel refuses to run a binary whose permitted file caps are outside
+    # the bounding set - so it is granted back rather than fought.
+    cap_drop: ["ALL"]
+    cap_add: ["NET_BIND_SERVICE"]
+    ports:
+      - "${HTTPS_PORT:-8443}:8443"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data      # the local CA and issued certificates
+      - caddyconfig:/config
+    depends_on:
+      - backend
+      - frontend
 
   # Training-only image. Behind a profile so `docker compose up` never starts it:
   # it exists to be `run`, and it carries PyTorch (~1.9 GB) which the API must
@@ -177,3 +227,5 @@ volumes:
   neo4jlogs:
   redisdata:
   backendstorage:
+  caddydata:
+  caddyconfig:

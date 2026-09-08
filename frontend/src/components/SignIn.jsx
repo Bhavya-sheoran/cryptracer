@@ -9,7 +9,7 @@ import { useToast } from './ui/toast-context.js';
  * The role matters beyond access control: only a supervisor can authorise a
  * freeze or an STR, so who is signed in changes what the dashboard permits.
  */
-export default function SignIn({ onSignedIn }) {
+export default function SignIn({ onSignedIn, demoAuthEnabled }) {
   const toast = useToast();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -71,26 +71,40 @@ export default function SignIn({ onSignedIn }) {
             </div>
           </form>
 
-          <div className="stack">
-            <h4>Demonstration accounts</h4>
-            <p className="hint">
-              Published credentials for this prototype only. The two roles exist to demonstrate
-              separation of duties: an investigator drafts a freeze request, a supervisor
-              authorises it. Neither can approve their own.
-            </p>
-            <div className="row wrap">
-              <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => quick('investigator')}>
-                Sign in as investigator
-              </button>
-              <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => quick('supervisor')}>
-                Sign in as supervisor
-              </button>
+          {demoAuthEnabled ? (
+            <div className="stack">
+              <h4>Demonstration accounts</h4>
+              <p className="hint">
+                Published credentials for this prototype only. The two roles exist to demonstrate
+                separation of duties: an investigator drafts a freeze request, a supervisor
+                authorises it. Neither can approve their own.
+              </p>
+              <div className="row wrap">
+                <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => quick('investigator')}>
+                  Sign in as investigator
+                </button>
+                <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => quick('supervisor')}>
+                  Sign in as supervisor
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="stack">
+              <h4>Accounts</h4>
+              <p className="hint">
+                Demonstration accounts are disabled on this deployment. Sign in with the
+                credentials issued to you.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </section>
   );
 }
 
-SignIn.propTypes = { onSignedIn: PropTypes.func.isRequired };
+SignIn.propTypes = {
+  onSignedIn: PropTypes.func.isRequired,
+  demoAuthEnabled: PropTypes.bool,
+};
+SignIn.defaultProps = { demoAuthEnabled: false };

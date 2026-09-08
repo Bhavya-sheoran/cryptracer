@@ -1,5 +1,19 @@
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8001';
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8001/api/v1/ws/alerts';
+/** Same origin by default.
+ *
+ *  Empty rather than an absolute URL so one build works everywhere: hit
+ *  directly, Vite proxies /api to the backend; hit through Caddy, Caddy does.
+ *  Neither path is cross-origin, so there is no CORS preflight to satisfy and
+ *  no hardcoded http:// to break the page under https with mixed content.
+ *  Set VITE_API_BASE only to point at a backend on a genuinely different host.
+ */
+const API_BASE = import.meta.env.VITE_API_BASE || '';
+
+/** The alert socket follows the page's own scheme, so it is wss:// under
+ *  https and ws:// under plain http without anything being configured. */
+const WS_URL =
+  import.meta.env.VITE_WS_URL ||
+  `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}` +
+    '/api/v1/ws/alerts';
 
 /** Bearer token for the signed-in officer. Kept in module scope, not localStorage:
  *  a demo token in localStorage survives the tab and is readable by any script

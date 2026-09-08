@@ -20,7 +20,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p /app/storage
+# Unprivileged runtime user. A container escape from a root process lands as
+# root on the host namespace; from this one it lands as nobody in particular.
+RUN groupadd --system --gid 1001 app \
+ && useradd --system --uid 1001 --gid app --home-dir /app --shell /usr/sbin/nologin app \
+ && mkdir -p /app/storage \
+ && chown -R app:app /app/storage \
+ && chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 8000
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
