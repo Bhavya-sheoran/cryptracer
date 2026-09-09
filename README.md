@@ -1,47 +1,4 @@
-# SIH26183 — Real-Time Identification of Fraud-Linked Cryptocurrency Exchanges
 
-Prototype for Smart India Hackathon 2026, Problem Statement **SIH26183**
-(Ministry of Home Affairs · Blockchain & Cybersecurity).
-
-A victim reports a suspect wallet address. The system traces the flow of funds
-across hops, attributes the terminal address cluster to an exchange/VASP, scores
-that exchange's fraud linkage against prior reported cases, and hands an
-investigator an explainable, actionable result.
-
----
-
-## Honest scoping — read this first
-
-**On the problem statement.** The official SIH portal has not published an
-expanded background or expected-outcome annexure for SIH26183 (unlike its
-sibling SIH26184). The architecture here is a considered engineering
-interpretation of the problem statement *title*, not a paraphrase of an official
-brief.
-
-**On the data.** This system contains **no real NCRP complaint data and no real
-exchange KYC data**, and no such access is claimed anywhere in this repository.
-Everything it operates on is one of:
-
-- **Synthetic** — victim complaints and the fraud-ring transaction graph are
-  produced by `scripts/generate_synthetic_complaints.py`, a permanent part of
-  this codebase.
-- **Public datasets** — the Elliptic Bitcoin Dataset (classifier training and
-  validation), Etherscan Label Cloud, GraphSense TagPacks, and the OFAC SDN
-  crypto address list (VASP tagging seed data).
-- **Public blockchain indexer APIs** — Etherscan, TronGrid, Blockchair — when
-  API keys are supplied and `DEMO_MODE=false`.
-
-The backend reports its own provenance at `/api/v1/health/ready`, and the UI
-banner is rendered from that field rather than from hardcoded copy, so the claim
-on screen cannot drift from how the system is actually configured.
-
-**On enforcement actions.** The system **recommends**; an authorised officer
-**approves**. Freeze requests and disclosure/STR drafts are created in a `draft`
-state and cannot reach `approved` without an explicit click by a user holding the
-`supervisor` role. Nothing auto-fires. This is enforced at three layers: a
-database `CHECK` constraint, a service-layer role check, and a test.
-
----
 
 ## Status
 
