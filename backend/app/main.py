@@ -25,12 +25,17 @@ from app.api.v1 import (
 from app.config import check_secrets, get_settings
 from app.db import migrations, redis_client
 from app.db import neo4j as neo4j_db
-from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-logger = logging.getLogger(__name__)
+from app.logging_config import configure_logging
+from app.middleware import (
+    RateLimitMiddleware,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+)
 
 settings = get_settings()
+
+configure_logging(log_format=settings.log_format, level=settings.log_level)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -100,6 +105,9 @@ def create_app() -> FastAPI:
             auth_window=settings.rate_limit_auth_window_seconds,
         )
     app.add_middleware(SecurityHeadersMiddleware)
+    # Outermost of ours, so the request id exists before anything else runs and
+    # a rate-limited or header-rejected response still carries one.
+    app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,

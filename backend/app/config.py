@@ -90,6 +90,21 @@ class Settings(BaseSettings):
     # --- CORS ---------------------------------------------------------------
     cors_origins: str = "http://localhost:5173"
 
+    # --- Storage ------------------------------------------------------------
+    # Where evidence files and generated PDF reports are written. Configurable
+    # because it was hardcoded to the container path: anything running outside
+    # a container - a CI runner, a developer without Docker - hit
+    # PermissionError on "/app" and the failure surfaced as an unrelated
+    # 500 from an upload endpoint.
+    storage_dir: str = "/app/storage"
+
+    # --- Observability ------------------------------------------------------
+    # "console" is readable in a terminal; "json" is what a log aggregator can
+    # filter on. Defaulting to console because JSON in a dev terminal is what
+    # makes people turn logging down, which costs more than it saves.
+    log_format: str = "console"
+    log_level: str = "INFO"
+
     # --- Rate limiting ------------------------------------------------------
     # The general ceiling is set well above what the dashboard or the e2e
     # script produce; it is there to stop scripted abuse, not to pace normal

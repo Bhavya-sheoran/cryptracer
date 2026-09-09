@@ -14,8 +14,6 @@ worse than none, because every later diff is measured against a fiction.
 
 from __future__ import annotations
 
-from logging.config import fileConfig
-
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
@@ -24,8 +22,12 @@ from app.models.core import Base
 
 config = context.config
 
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# `fileConfig(config.config_file_name)` is the alembic scaffold default and is
+# deliberately NOT called here. It reconfigures the root logger from
+# alembic.ini, and migrations run inside the application's startup - so it
+# clobbered the app's own handler and every subsequent line came out in
+# alembic.ini's format, without the request id. Alembic inherits whatever
+# logging the caller has already configured instead.
 
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
 

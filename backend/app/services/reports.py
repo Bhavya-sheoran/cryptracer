@@ -26,7 +26,7 @@ from app.models import Case, CaseNote, CaseWallet, Evidence, Report, TraceRun, U
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-STORAGE = Path("/app/storage")
+STORAGE = Path(settings.storage_dir)
 REPORT_DIR = STORAGE / "reports"
 
 SYNTHETIC_NOTICE = (

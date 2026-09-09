@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db.postgres import get_db
 from app.deps import get_current_user, record_audit
 from app.models import Case, CaseNote, CaseWallet, Evidence, Report, TraceRun, User, Wallet
@@ -20,7 +21,10 @@ from app.services import reports as reports_svc
 
 router = APIRouter(prefix="/cases", tags=["cases"])
 
-EVIDENCE_DIR = Path("/app/storage/evidence")
+# Read from settings, not hardcoded to the container path. Outside a container
+# "/app" is not writable and the mkdir failed with PermissionError, surfacing
+# as an opaque 500 from the upload endpoint rather than a configuration error.
+EVIDENCE_DIR = Path(get_settings().storage_dir) / "evidence"
 MAX_EVIDENCE_BYTES = 25 * 1024 * 1024  # 25 MB
 
 

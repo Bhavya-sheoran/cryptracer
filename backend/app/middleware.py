@@ -13,11 +13,16 @@ from __future__ import annotations
 
 import ipaddress
 import logging
+import re
 import time
+import uuid
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+
+from app import metrics
+from app.logging_config import request_id_var
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +40,92 @@ _DOCS_CSP = (
     "connect-src 'self'; "
     "frame-ancestors 'none'; base-uri 'none'"
 )
+
+
+class RequestContextMiddleware(BaseHTTPMiddleware):
+    """Give every request an id, log its outcome, and return the id.
+
+    The id is echoed in `X-Request-ID` so an officer reporting "my trace
+    failed" can quote something that finds the exact log lines, rather than
+    describing what they were doing and hoping the timestamps line up.
+
+    An inbound `X-Request-ID` is honoured so a reverse proxy or a calling
+    service can correlate across hops - but it is length-capped and stripped of
+    anything unusual first. It ends up in log output, and an unbounded
+    client-controlled string in a log file is how log injection works.
+    """
+
+    MAX_ID_LENGTH = 64
+    #: Anything outside this is dropped rather than escaped. Request ids are
+    #: opaque identifiers; there is no legitimate reason for one to contain a
+    #: newline, a quote, or a control character.
+    _SAFE_ID = re.compile(r"[^A-Za-z0-9._-]")
+
+    #: Health probes run on a timer and would otherwise dominate the log.
+    QUIET_PATHS = ("/api/v1/health",)
+
+    def _incoming_id(self, request: Request) -> str | None:
+        raw = request.headers.get("X-Request-ID", "").strip()
+        if not raw:
+            return None
+        cleaned = self._SAFE_ID.sub("", raw)[: self.MAX_ID_LENGTH]
+        return cleaned or None
+
+    async def dispatch(self, request: Request, call_next):
+        request_id = self._incoming_id(request) or uuid.uuid4().hex[:16]
+        token = request_id_var.set(request_id)
+        started = time.perf_counter()
+
+        try:
+            response = await call_next(request)
+        except Exception:
+            # Logged here because the exception handler that turns this into a
+            # 500 runs outside the request context, where the id is already
+            # gone - so this is the last place the failure and its id coexist.
+            logger.exception(
+                "request failed",
+                extra={
+                    "method": request.method,
+                    "path": request.url.path,
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 1),
+                },
+            )
+            request_id_var.reset(token)
+            raise
+
+        elapsed = time.perf_counter() - started
+        duration_ms = round(elapsed * 1000, 1)
+        response.headers["X-Request-ID"] = request_id
+
+        # Recorded for health paths too. A readiness probe that starts taking
+        # two seconds is an early symptom of a datastore in trouble, and
+        # excluding it from metrics the way it is excluded from logs would
+        # discard exactly that signal.
+        endpoint = metrics.normalise_endpoint(request.url.path)
+        metrics.http_requests_total.labels(
+            method=request.method, endpoint=endpoint, status=str(response.status_code)
+        ).inc()
+        metrics.http_request_duration_seconds.labels(
+            method=request.method, endpoint=endpoint
+        ).observe(elapsed)
+
+        if not request.url.path.startswith(self.QUIET_PATHS):
+            logger.log(
+                logging.WARNING if response.status_code >= 500 else logging.INFO,
+                "%s %s -> %s",
+                request.method,
+                request.url.path,
+                response.status_code,
+                extra={
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status": response.status_code,
+                    "duration_ms": duration_ms,
+                },
+            )
+
+        request_id_var.reset(token)
+        return response
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

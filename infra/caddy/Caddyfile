@@ -28,6 +28,17 @@ localhost:8443, 127.0.0.1:8443 {
 	# localhost to https for a year would break every other project you run.
 	header Strict-Transport-Security "max-age=3600"
 
+	# Prometheus exposition is internal-only. It leaks operational shape -
+	# request volumes, error rates, which endpoints exist, how many officers
+	# signed in - and none of that belongs on a public origin. A scraper lives
+	# inside the compose network and reaches the backend directly.
+	#
+	# Declared before the @backend matcher below, because Caddy evaluates
+	# handle blocks in file order and /api/* would otherwise swallow it.
+	handle /api/v1/health/metrics* {
+		respond "Not Found" 404
+	}
+
 	# The API, its docs, and the alert socket.
 	@backend path /api/* /docs /docs/* /openapi.json /redoc /redoc/*
 	handle @backend {

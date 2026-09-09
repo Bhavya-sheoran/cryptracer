@@ -33,14 +33,24 @@ def test_baseline_revision_is_pinned():
 
 
 def test_status_reports_the_live_database(pg_available):
+    """Status reflects the database it is pointed at.
+
+    Deliberately does NOT assert that a revision is already stamped. It did,
+    and that made the test a statement about one particular deployment rather
+    than about the code: CI builds its schema by running init.sql directly, so
+    Alembic has never seen it and `revision` is legitimately None. Whether
+    upgrading *sets* one is covered by test_upgrade_is_idempotent.
+    """
     if not pg_available:
         pytest.skip("postgres not reachable")
 
     state = migrations.status()
     assert state["schema_exists"] is True
-    assert state["revision"] is not None, (
-        "the live database should be stamped; run scripts/migrate.py"
-    )
+    assert set(state) == {"schema_exists", "revision", "predates_alembic"}
+    # The two must agree: an unstamped schema is exactly what "predates
+    # alembic" means, and disagreement would mean the stamp-or-upgrade
+    # decision is being made on inconsistent information.
+    assert state["predates_alembic"] == (state["revision"] is None)
 
 
 def test_advisory_lock_id_is_stable():
