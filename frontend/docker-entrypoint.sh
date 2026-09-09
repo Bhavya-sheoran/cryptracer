@@ -9,7 +9,11 @@ set -e
 
 if [ "$(id -u)" = "0" ]; then
     chown -R node:node /app/node_modules 2>/dev/null || true
-    exec su-exec node "$@"
+    # setpriv, from util-linux in the Debian base. The Alpine image used
+    # su-exec, which Debian does not ship; setpriv is equivalent and, unlike
+    # `su`, does not put a shell between us and Vite - so signals reach the
+    # dev server and the container stops cleanly.
+    exec setpriv --reuid=node --regid=node --init-groups "$@"
 fi
 
 exec "$@"

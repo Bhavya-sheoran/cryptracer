@@ -1,4 +1,14 @@
-FROM node:22-alpine
+# Debian (glibc), not Alpine (musl), and the reason is the lockfile.
+#
+# Rollup ships its native binary as a set of platform-specific optional
+# dependencies. npm records whichever matches the machine that generated the
+# lockfile and then, through a long-standing bug (npm/cli#4828), `npm ci` on a
+# different platform fails to install the one it actually needs. A lockfile
+# built on Alpine names @rollup/rollup-linux-x64-musl; CI runs on Ubuntu and
+# needs -gnu, so vitest died at startup with "Cannot find module".
+#
+# Pinning both to glibc removes the mismatch rather than working around npm.
+FROM node:22-slim
 
 WORKDIR /app
 
@@ -19,8 +29,9 @@ COPY . .
 # Note this image runs the Vite *dev server*. It is a development artifact and
 # should never be the production frontend: build the static bundle and serve it
 # from a web server instead.
-RUN apk add --no-cache su-exec \
- && chown -R node:node /app \
+# setpriv comes from util-linux in the Debian base, so no package to install -
+# the Alpine build needed su-exec, which does not exist here.
+RUN chown -R node:node /app \
  && chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 5173

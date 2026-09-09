@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import metrics
 from app.config import get_settings
 from app.models import Case, CaseWallet, TraceRun, Wallet
 from app.services import clustering, graph_writer, illicit_model
@@ -145,9 +146,20 @@ def expand_money_flow(
 
             try:
                 calls_made += 1
+                metrics.upstream_calls_total.labels(source=connector.source_name).inc()
                 txs = connector.get_transactions(address, limit=max_breadth)
             except ConnectorError as exc:
-                logger.warning("connector failed for %s at depth %d: %s", address, depth, exc)
+                # Counted, not just logged. An indexer failing does not break
+                # anything visibly - it silently shortens every trace, and the
+                # truncated answer still looks like an answer.
+                metrics.indexer_errors_total.labels(source=connector.source_name).inc()
+                logger.warning(
+                    "connector failed for %s at depth %d: %s",
+                    address,
+                    depth,
+                    exc,
+                    extra={"source": connector.source_name, "depth": depth},
+                )
                 continue
 
             for tx in txs:

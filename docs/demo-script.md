@@ -17,7 +17,8 @@ docker compose exec backend python ml/src/download_data.py all   # once, ~65 min
 docker compose exec backend python ml/src/seed_tags.py           # 3,221 public tags
 
 # Prove the pipeline is green while nobody is watching.
-docker compose exec backend python scripts/e2e_demo.py     # expect 42/42
+docker compose exec backend python -m pytest               # expect 320 passed
+docker compose exec backend python scripts/e2e_demo.py     # expect 40-42/42
 
 # Then reset, LAST, so the demo starts from exactly 13 complaints.
 docker compose exec backend python scripts/load_demo.py --reset --skip-tags
@@ -29,9 +30,19 @@ wallet reported a hundred times reads as High simply because you rehearsed.
 `--reset` clears the case-side data (leaving the tag database and the demo
 accounts alone), so run it *after* your last verification pass, not before.
 
-Open **http://localhost:5174** and sign in as **investigator** so the first
+Open **https://localhost:8443** and sign in as **investigator** so the first
 click of the demo is not a login form. Keep a second browser profile signed in
 as **supervisor** — you will need both for the approval step.
+
+> **Accept the certificate before the demo, not during it.** Caddy issues one
+> from its own local authority, so the browser warns on first visit. Click
+> through (Advanced → Proceed), or install the root CA once — see
+> `docs/tls.md`. Doing this in front of an audience looks like a fault when it
+> is the expected behaviour of a self-signed certificate.
+>
+> `http://localhost:5174` still works and skips the warning entirely. It is
+> plain HTTP, so prefer 8443 if anyone asks about transport security — but it
+> is a perfectly good fallback if the certificate misbehaves on the day.
 
 `load_demo.py` prints the addresses to use at the end of its output. **Always
 take them from there, never from this document** - they change whenever the
@@ -41,7 +52,7 @@ front of an audience.
 Fastest path of all, which signs in and opens a trace in one link:
 
 ```
-http://localhost:5174/?demo=investigator&address=<TRON address from load_demo>
+https://localhost:8443/?demo=investigator&address=<TRON address from load_demo>
 ```
 
 ---

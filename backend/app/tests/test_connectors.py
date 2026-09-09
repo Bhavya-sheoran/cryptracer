@@ -71,7 +71,19 @@ def test_live_connectors_declare_distinct_source_names():
     assert names == {"etherscan", "trongrid", "blockchair", "synthetic"}
 
 
-def test_etherscan_connector_refuses_to_start_without_a_key():
+def test_etherscan_connector_refuses_to_start_without_a_key(monkeypatch):
+    """No key anywhere - argument or settings - must refuse to construct.
+
+    The settings value is patched rather than left ambient. Passing api_key=""
+    only falls through to `settings.etherscan_api_key`, so this test silently
+    stopped testing anything the moment a real key was configured: it had been
+    passing because the environment happened to be empty, not because the guard
+    worked.
+    """
+    from app.services.connectors import live
+
+    monkeypatch.setattr(live.settings, "etherscan_api_key", "", raising=False)
+
     with pytest.raises(ConnectorError):
         EtherscanConnector(api_key="")
 

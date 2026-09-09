@@ -1,0 +1,42 @@
+# Root-level lint config.
+#
+# `backend/pyproject.toml` already configures ruff, but ruff resolves config by
+# walking up from each file - so `backend/app/...` found it while `scripts/`
+# and `ml/src/` walked to the repo root, found nothing, and were checked with
+# ruff's defaults instead (a different rule set and a different line length).
+#
+# That meant "ruff passes" depended on which directory you invoked it from,
+# which is exactly the kind of difference that shows up first as a red CI run
+# nobody can reproduce locally. This file makes the answer the same everywhere.
+#
+# Keep these values in sync with backend/pyproject.toml [tool.ruff]; that file
+# still wins for anything under backend/, being the nearer config.
+line-length = 100
+target-version = "py311"
+
+# Where importable packages live. Without this, ruff run from the repo root
+# cannot tell that `app` is our own code - `app` is not a top-level directory
+# here, `backend/app` is - so it classified it as third-party and demanded a
+# different import order than the same check run from inside backend/.
+# Import sorting then depended on which directory you invoked ruff from.
+src = ["backend", "."]
+
+[lint]
+select = ["E", "F", "I", "UP", "B"]
+# B008 flags function calls in default arguments. Depends(get_db) is the
+# documented FastAPI dependency-injection idiom, so it is excluded rather than
+# worked around.
+ignore = ["B008"]
+
+[lint.isort]
+# Stated explicitly rather than inferred. `src` above should be enough, but
+# naming it removes the last way this can differ between a developer's machine
+# and CI - and an import-order rule that disagrees with itself depending on
+# where it ran is worse than no rule.
+known-first-party = ["app"]
+
+# `backend/alembic/` is our migrations directory; `alembic` is also the PyPI
+# package we import. The directory shadows the package name, so ruff inferred
+# it was first-party and wanted `from alembic import command` sorted with our
+# own modules. It is a third-party library that happens to share a name.
+known-third-party = ["alembic"]

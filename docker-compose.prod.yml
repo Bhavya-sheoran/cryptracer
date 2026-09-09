@@ -20,21 +20,56 @@
 # policy, backups, CI, and the Postgres password rotation. See the readiness
 # roadmap - this file closes the network surface, not the whole tier.
 
+#   * Sets memory limits and restart policies. An eight-hop trace on a heavily
+#     connected wallet is the query most likely to exhaust memory, and without
+#     a limit the kernel's OOM killer picks a victim by its own arithmetic -
+#     which is how one expensive request takes down Postgres instead of
+#     failing itself.
+
 services:
   postgres:
     ports: !override []
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: {memory: 1g}
 
   neo4j:
     ports: !override []
+    restart: unless-stopped
+    environment:
+      # Kept below the container limit on purpose. The JVM heap is not the
+      # whole footprint - the page cache and off-heap buffers live alongside
+      # it, and sizing the heap to the limit guarantees the container is killed
+      # under load rather than the query failing.
+      NEO4J_server_memory_heap_max__size: 2G
+      NEO4J_server_memory_pagecache_size: 1G
+    deploy:
+      resources:
+        limits: {memory: 4g}
 
   redis:
     ports: !override []
+    restart: unless-stopped
+    # Redis holds the alert stream, which is trimmed but unbounded in the sense
+    # that nothing else caps it. allkeys-lru means a memory spike drops old
+    # cache entries rather than the process.
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "384mb",
+              "--maxmemory-policy", "allkeys-lru"]
+    deploy:
+      resources:
+        limits: {memory: 512m}
 
   backend:
     ports: !override []
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: {memory: 2g}
     environment:
       DEMO_MODE: "false"
       ALLOW_DEMO_AUTH: "false"
+      LOG_FORMAT: "json"
     # Read-only source, baked into the image at build time rather than mounted
     # from the host. Storage stays writable - it holds evidence and reports.
     volumes: !override
@@ -45,7 +80,15 @@ services:
 
   frontend:
     ports: !override []
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: {memory: 512m}
 
   caddy:
+    restart: unless-stopped
     ports:
       - "${HTTPS_PORT:-8443}:8443"
+    deploy:
+      resources:
+        limits: {memory: 256m}

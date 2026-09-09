@@ -396,15 +396,25 @@ def test_analysis_publishes_an_alert_for_medium_or_high(stack_up, tokens):
     from app.services import alerts as alerts_svc
     from app.services.connectors.synthetic import get_complaints
 
-    before = len(alerts_svc.read_alerts("0-0", count=500))
+    # Compare the newest stream id rather than a count. Counting cannot work
+    # here: read_alerts caps its read, and the stream itself is trimmed to
+    # STREAM_MAXLEN, so on a long-lived stack both `before` and `after`
+    # saturate at the same number and the assertion silently stops testing
+    # anything. Redis stream ids are monotonic, so a changed newest id is proof
+    # an entry was appended no matter how full the stream is.
+    def newest_id() -> str:
+        latest = alerts_svc.read_alerts("0-0", count=1)
+        return latest[0]["stream_msg_id"] if latest else "0-0"
+
+    before = newest_id()
     address = next(c["address"] for c in get_complaints() if c["chain"] == "TRON")
     body = client.get(
         "/api/v1/wallet", params={"address": address}, headers=auth(tokens["investigator"])
     ).json()
 
-    after = len(alerts_svc.read_alerts("0-0", count=500))
+    after = newest_id()
     if body["risk_label"] in ("medium", "high"):
-        assert after > before, "a medium/high resolution must raise an alert"
+        assert after != before, "a medium/high resolution must raise an alert"
         assert get_client().xlen(alerts_svc.STREAM_KEY) > 0
 
 

@@ -95,7 +95,7 @@ API contracts: **[docs/api.md](docs/api.md)**.
 
 ### What Phase 3 actually does
 
-Open **http://localhost:5174**. Plain JavaScript + JSX throughout — no
+Open **https://localhost:8443** (Caddy, TLS — accept the local-CA certificate on first visit; see `docs/tls.md`). `http://localhost:5174` remains available for development. Plain JavaScript + JSX throughout — no
 TypeScript, PropTypes for runtime type-checking.
 
 10. **Intake form** validates as you type against `/wallets/validate`, so a
@@ -422,7 +422,8 @@ Windows setup — the raw equivalents are:
 
 | Service | URL |
 |---|---|
-| Frontend | http://localhost:5174 |
+| Dashboard (TLS) | https://localhost:8443 |
+| Dashboard (plain HTTP) | http://localhost:5174 |
 | Backend API docs | http://localhost:8001/docs |
 | Readiness probe | http://localhost:8001/api/v1/health/ready |
 | Neo4j Browser | http://localhost:7475 (`neo4j` / `sihdevpass`) |
@@ -517,7 +518,7 @@ Northwind at hop 7 (ETH, via a mixer, flagged), Kestrel at hop 5 (BTC).
 
 ### Dashboard demo path
 
-1. Open **http://localhost:5174**.
+1. Open **https://localhost:8443** (Caddy, TLS — accept the local-CA certificate on first visit; see `docs/tls.md`). `http://localhost:5174` remains available for development.
 2. Paste a synthetic address from `ml/seeds/synthetic_dataset.json` into the
    form — chain and checksum validate as you type.
 3. **Analyse only** draws the trace for an address already in the graph;

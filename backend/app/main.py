@@ -23,15 +23,19 @@ from app.api.v1 import (
     ws,
 )
 from app.config import check_secrets, get_settings
+from app.db import migrations, redis_client
 from app.db import neo4j as neo4j_db
-from app.db import postgres as postgres_db
-from app.db import redis_client
-from app.middleware import RateLimitMiddleware, SecurityHeadersMiddleware
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-logger = logging.getLogger(__name__)
+from app.logging_config import configure_logging
+from app.middleware import (
+    RateLimitMiddleware,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+)
 
 settings = get_settings()
+
+configure_logging(log_format=settings.log_format, level=settings.log_level)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -47,12 +51,23 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("neo4j constraint bootstrap deferred: %s", exc)
 
-    # Schema added after the database was first created never reaches an
-    # existing volume through docker-entrypoint-initdb.d, which only runs once.
+    # Alembic, holding an advisory lock so concurrent workers cannot race. A
+    # database created before Alembic existed is stamped at the baseline rather
+    # than rebuilt. Failure is logged but does not kill the API: /health/ready
+    # is what reports the real state, and an API that refuses to start cannot
+    # even tell anyone why.
     try:
-        postgres_db.apply_pending_ddl()
+        result = migrations.upgrade_to_head()
+        if result["stamped"]:
+            logger.info("stamped pre-alembic database at baseline")
+        if result["from_revision"] != result["to_revision"]:
+            logger.info(
+                "schema migrated: %s -> %s",
+                result["from_revision"] or "unversioned",
+                result["to_revision"],
+            )
     except Exception as exc:
-        logger.warning("postgres DDL bootstrap deferred: %s", exc)
+        logger.warning("postgres migration deferred: %s", exc)
 
     if settings.demo_mode:
         logger.info("DEMO_MODE=true - blockchain connectors will serve SYNTHETIC data")
@@ -90,6 +105,9 @@ def create_app() -> FastAPI:
             auth_window=settings.rate_limit_auth_window_seconds,
         )
     app.add_middleware(SecurityHeadersMiddleware)
+    # Outermost of ours, so the request id exists before anything else runs and
+    # a rate-limited or header-rejected response still carries one.
+    app.add_middleware(RequestContextMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
