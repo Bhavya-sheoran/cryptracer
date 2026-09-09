@@ -1,0 +1,264 @@
+name: CI
+
+# Every push and every pull request. The suite is strong but nothing enforced
+# it - a broken commit reached the branch and only a human running pytest
+# locally would have noticed.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # A new push supersedes an in-flight run on the same ref. Without this,
+  # pushing three times in a minute queues three full runs of a suite that
+  # needs Neo4j, and the first two answer questions nobody is asking any more.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "22"
+
+jobs:
+  # --------------------------------------------------------------------
+  # Fast feedback. Runs in under a minute and catches most mistakes, so it
+  # is separate from the job that has to wait ~90s for Neo4j to load GDS.
+  # --------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install ruff
+        run: pip install "ruff>=0.8"
+
+      - name: Ruff
+        run: ruff check backend/app scripts ml/src
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: ESLint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Assert no TypeScript
+        # A project rule, not a preference: this codebase is plain JSX with
+        # PropTypes. Enforced here because a .ts file added in a hurry is
+        # exactly the kind of thing review misses.
+        run: |
+          found=$(find frontend/src -name '*.ts' -o -name '*.tsx' | head)
+          if [ -n "$found" ]; then
+            echo "TypeScript files found, which this project does not use:"
+            echo "$found"
+            exit 1
+          fi
+          echo "no .ts/.tsx files - correct"
+
+  # --------------------------------------------------------------------
+  # The real suite. Needs all three datastores; the graph tests skip
+  # cleanly without Neo4j, and a suite that silently skips its hardest
+  # tests is the failure mode this pipeline exists to prevent.
+  # --------------------------------------------------------------------
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sih
+          POSTGRES_PASSWORD: sihdev
+          POSTGRES_DB: sih183
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sih -d sih183"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+
+      neo4j:
+        image: neo4j:5.26-community
+        env:
+          NEO4J_AUTH: neo4j/sihdevpass
+          NEO4J_PLUGINS: '["graph-data-science","apoc"]'
+          NEO4J_dbms_security_procedures_unrestricted: "gds.*,apoc.*"
+          NEO4J_dbms_security_procedures_allowlist: "gds.*,apoc.*"
+        ports: ["7687:7687", "7474:7474"]
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"
+          --health-interval 10s --health-timeout 10s --health-retries 30
+          --health-start-period 120s
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Apply database schema
+        env:
+          PGPASSWORD: sihdev
+        run: |
+          psql -h localhost -U sih -d sih183 -f infra/postgres/init.sql
+          psql -h localhost -U sih -d sih183 -f infra/postgres/002_exposure.sql
+
+      - name: Wait for Neo4j to accept Bolt
+        # The container health check answers as soon as the HTTP listener
+        # binds, which is before GDS and APOC finish registering. Bolt is what
+        # the tests actually use, so that is what we wait on.
+        working-directory: backend
+        run: |
+          cat > /tmp/wait_neo4j.py <<'PY'
+          import sys, time
+          from neo4j import GraphDatabase
+          for attempt in range(60):
+              try:
+                  driver = GraphDatabase.driver(
+                      "bolt://localhost:7687", auth=("neo4j", "sihdevpass")
+                  )
+                  driver.verify_connectivity()
+                  driver.close()
+                  print(f"neo4j reachable after ~{attempt * 5}s")
+                  sys.exit(0)
+              except Exception:
+                  time.sleep(5)
+          sys.exit("neo4j never accepted a Bolt connection")
+          PY
+          python /tmp/wait_neo4j.py
+
+      - name: Run tests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://sih:sihdev@localhost:5432/sih183
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_PASSWORD: sihdevpass
+          REDIS_URL: redis://localhost:6379/0
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          python -m pytest -p no:cacheprovider --tb=short -q
+
+      - name: Assert the graph tests actually ran
+        # Guards against the suite passing because every Neo4j test skipped.
+        # A green run that tested nothing is worse than a red one.
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://sih:sihdev@localhost:5432/sih183
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_PASSWORD: sihdevpass
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          python -m pytest app/tests/test_clustering.py -p no:cacheprovider -q \
+            --tb=no 2>&1 | tee result.txt
+          if grep -qE "[0-9]+ skipped" result.txt && ! grep -qE "[0-9]+ passed" result.txt; then
+            echo "clustering tests all skipped - Neo4j was not actually exercised"
+            exit 1
+          fi
+
+  # --------------------------------------------------------------------
+  frontend:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run tests
+        working-directory: frontend
+        run: npm run test:run
+
+      - name: Build
+        # A passing test suite over code that does not build is not a green
+        # branch. This is the cheapest way to catch an import that only
+        # resolves under the dev server.
+        working-directory: frontend
+        run: npm run build
+
+  # --------------------------------------------------------------------
+  # Advisory rather than blocking. A new CVE in a transitive dependency is
+  # not a reason to stop a branch that was fine an hour ago - but it does
+  # need to be visible the day it lands, not at the next manual audit.
+  # --------------------------------------------------------------------
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit -r backend/requirements.txt --desc
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: npm audit
+        working-directory: frontend
+        run: npm audit --audit-level=moderate
+
+  # --------------------------------------------------------------------
+  images:
+    name: Image scan
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -t sih183-backend:ci ./backend
+
+      - name: Scan backend image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: sih183-backend:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "0"

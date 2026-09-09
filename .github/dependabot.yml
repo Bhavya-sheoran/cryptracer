@@ -1,0 +1,56 @@
+# Automated dependency updates.
+#
+# The clean audit this project currently has is a snapshot, not a standing
+# guarantee: it was true the day it was measured and says nothing about
+# tomorrow. This keeps it true without anyone remembering to check.
+#
+# Weekly rather than daily, and minor/patch grouped into one PR per ecosystem,
+# because a pipeline that opens eight pull requests a week trains people to
+# close them unread - which leaves the project less safe than no automation.
+version: 2
+
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      python-minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    ignore:
+      # Major bumps of these have broken this project before: xgboost 2.x/3.x
+      # drift against scikit-learn's internals is why the trainer uses the
+      # native Booster API. Majors get raised deliberately, not automatically.
+      - dependency-name: xgboost-cpu
+        update-types: ["version-update:semver-major"]
+      - dependency-name: scikit-learn
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      js-minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

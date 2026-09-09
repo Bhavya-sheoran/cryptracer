@@ -15,7 +15,22 @@ import os
 # minute and start returning 429 to tests that are about correctness, not
 # throughput. The limiter itself is covered by test_middleware.py, which builds
 # an app with it switched on.
-os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+# Assigned, not setdefault: docker-compose sets both of these in the container
+# environment, so setdefault silently deferred to compose and the suite ran
+# with the limiter ON. That went unnoticed until a burst of intentionally
+# failing logins tripped the lockout and took 50 unrelated tests with it. The
+# test environment has to win over the deployment environment here.
+os.environ["RATE_LIMIT_ENABLED"] = "false"
+
+# The suite must never call a live indexer. Real API calls would make it slow,
+# flaky, dependent on somebody's network, and would burn a rate-limited quota
+# that belongs to an investigation. The live path is verified deliberately and
+# by hand (see scripts/inspect_live_tx.py), never as a side effect of `pytest`.
+os.environ["DEMO_MODE"] = "true"
+
+# Most API tests sign in through the demo accounts, so the suite runs with that
+# path enabled. test_demo_auth.py asserts the gate itself, with the flag off.
+os.environ["ALLOW_DEMO_AUTH"] = "true"
 
 from datetime import UTC, datetime, timedelta  # noqa: E402
 from decimal import Decimal  # noqa: E402
