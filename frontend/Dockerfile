@@ -8,7 +8,7 @@
 # needs -gnu, so vitest died at startup with "Cannot find module".
 #
 # Pinning both to glibc removes the mismatch rather than working around npm.
-FROM node:22-slim
+FROM node:26-slim
 
 WORKDIR /app
 
