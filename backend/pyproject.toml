@@ -47,6 +47,17 @@ select = ["E", "F", "I", "UP", "B"]
 # worked around.
 ignore = ["B008"]
 
+[tool.ruff.lint.isort]
+# Must match the root ruff.toml. This is the nearer config, so it wins for
+# anything under backend/ - and if the two disagree, import order becomes a
+# function of which directory ruff was invoked from, which is how CI ends up
+# red over a file that lints clean locally.
+known-first-party = ["app"]
+# `backend/alembic/` is our migrations directory; `alembic` is also the PyPI
+# package. The directory shadows the package name, so ruff inferred it was
+# first-party. It is a third-party library that happens to share a name.
+known-third-party = ["alembic"]
+
 [tool.pytest.ini_options]
 testpaths = ["app/tests"]
 addopts = "-q"

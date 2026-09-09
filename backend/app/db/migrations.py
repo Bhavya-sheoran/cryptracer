@@ -77,9 +77,8 @@ def upgrade_to_head() -> dict:
     Returns what happened, so a caller can log it meaningfully instead of
     reporting a bare success.
     """
-    from alembic.runtime.migration import MigrationContext
-
     from alembic import command
+    from alembic.runtime.migration import MigrationContext
 
     config = _config()
     result = {"stamped": False, "from_revision": None, "to_revision": None}
