@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -9,12 +11,20 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db.postgres import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, oauth2_scheme
 from app.models import User
-from app.services.auth import AuthError, authenticate, create_access_token, seed_demo_users
+from app.services.auth import (
+    AuthError,
+    authenticate,
+    create_access_token,
+    decode_token,
+    seed_demo_users,
+)
+from app.services.sessions import revoke_all_for_user, revoke_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 class TokenResponse(BaseModel):
@@ -88,3 +98,36 @@ def seed(db: Session = Depends(get_db)):
         ],
         "notice": "Demonstration credentials. Replace before any real deployment.",
     }
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(
+    token: str | None = Depends(oauth2_scheme),
+    user: User = Depends(get_current_user),
+):
+    """End this session immediately.
+
+    Revokes the presented token by its `jti`, so the officer's other sessions -
+    a second browser, a phone - are untouched. Signing out on a shared machine
+    should not sign you out everywhere.
+
+    Idempotent: revoking an already-revoked token is a no-op, so a double click
+    is not an error.
+    """
+    payload = decode_token(token)
+    revoke_token(payload["jti"], payload["exp"])
+    logger.info("officer signed out", extra={"username": user.username})
+
+
+@router.post("/logout-everywhere", status_code=status.HTTP_204_NO_CONTENT)
+def logout_everywhere(user: User = Depends(get_current_user)):
+    """End every session this officer holds.
+
+    The response to a suspected compromise: a token you cannot see cannot be
+    revoked by id, so this records a cutoff and refuses anything issued before
+    it. Includes the session making the request.
+    """
+    revoke_all_for_user(str(user.id))
+    logger.warning(
+        "all sessions revoked", extra={"username": user.username, "user_id": str(user.id)}
+    )

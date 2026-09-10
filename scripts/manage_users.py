@@ -39,6 +39,7 @@ from app.services.auth import (
     ROLE_SUPERVISOR,
     hash_password,
 )
+from app.services.sessions import revoke_all_for_user
 
 ROLES = (ROLE_INVESTIGATOR, ROLE_SUPERVISOR, ROLE_ADMIN)
 
@@ -106,7 +107,23 @@ def cmd_deactivate(args) -> int:
         # and removing the row would orphan the record of who approved what.
         user.is_active = False
         db.commit()
-        print(f"deactivated {args.username!r} - sign-in refused, audit history intact")
+
+        # Kill live sessions too. Disabling an account only stops the next
+        # sign-in; any token already issued stays valid for its full eight
+        # hours, so an officer dismissed at 10am could still approve a freeze
+        # at 5pm. That is the case this exists for.
+        try:
+            revoke_all_for_user(str(user.id))
+            print(f"deactivated {args.username!r} - sign-in refused, live sessions ended")
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"deactivated {args.username!r}, but FAILED to revoke live sessions: {exc}\n"
+                f"  Existing tokens stay valid until they expire. Fix Redis and run:\n"
+                f"    python scripts/manage_users.py deactivate {args.username}",
+                file=sys.stderr,
+            )
+            return 1
+        print("  audit history intact")
     return 0
 
 
@@ -122,10 +139,14 @@ def cmd_reset_password(args) -> int:
         password = generate_password()
         user.hashed_password = hash_password(password)
         db.commit()
+
+        # A password reset that leaves old sessions alive does not lock anyone
+        # out - which is usually the entire reason for resetting it.
+        revoke_all_for_user(str(user.id))
+
         print(f"reset password for {args.username!r}")
         print(f"\n  password: {password}\n")
-        print("  Any token issued before now stays valid until it expires -")
-        print("  there is no revocation path yet (Tier 3 of the roadmap).")
+        print("  All existing sessions for this account have been ended.")
     return 0
 
 

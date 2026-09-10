@@ -82,6 +82,10 @@ def create_access_token(user: User) -> str:
         "sub": str(user.id),
         "username": user.username,
         "role": user.role,
+        # A unique id per token, so one session can be revoked without
+        # affecting the officer's other sessions. Without it the only options
+        # are "revoke everything for this user" or "revoke nothing".
+        "jti": uuid.uuid4().hex,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(minutes=settings.jwt_expire_minutes)).timestamp()),
     }
@@ -106,8 +110,11 @@ def decode_token(token: str) -> dict:
             settings.jwt_secret,
             algorithms=[settings.jwt_algorithm],
             # A token with no expiry would be valid forever; refuse it outright
-            # rather than trusting that we always set the claim.
-            options={"require": ["exp", "sub"]},
+            # rather than trusting that we always set the claim. `jti` is
+            # required too - without one a token cannot be revoked
+            # individually, and a token that cannot be revoked must not be
+            # accepted now that revocation is something we promise.
+            options={"require": ["exp", "sub", "jti", "iat"]},
         )
     except InvalidTokenError as exc:
         raise AuthError(f"invalid token: {exc}") from exc
