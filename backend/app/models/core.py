@@ -98,6 +98,14 @@ class AuditLog(Base):
     ip_address: Mapped[str | None] = mapped_column(INET)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    # Hash chain. Each entry commits to the one before it, so editing or
+    # deleting any row breaks every link after it and the tampering becomes
+    # detectable. Nullable because entries written before chaining existed have
+    # neither - those are reported as unverifiable rather than as tampering.
+    # See app/services/audit_chain.py.
+    prev_hash: Mapped[str | None] = mapped_column(Text)
+    entry_hash: Mapped[str | None] = mapped_column(Text)
+
 
 # ---------------------------------------------------------------------------
 # Wallets & cases

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.db.postgres import get_db
 from app.models import AuditLog, User
+from app.services import audit_chain, sessions
 from app.services.auth import APPROVER_ROLES, AuthError, decode_token, get_user_by_id
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,27 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
             headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+    # Revocation, checked before the user lookup so a terminated session costs
+    # a Redis read rather than a database query.
+    try:
+        if sessions.is_revoked(
+            payload.get("jti"), payload.get("sub"), payload.get("iat")
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="This session has been ended. Sign in again.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    except sessions.RevocationUnavailable as exc:
+        # Fails CLOSED. If we cannot tell whether a session was terminated, we
+        # must not assume it was not - otherwise a Redis outage silently
+        # re-admits every session anyone has revoked.
+        logger.error("refusing request: revocation state unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Session validation is temporarily unavailable. Try again shortly.",
         ) from exc
 
     user = get_user_by_id(db, payload.get("sub"))
@@ -96,15 +118,51 @@ def record_audit(
     payload: dict | None = None,
     request: Request | None = None,
 ) -> None:
-    """Append to the audit log. Every approval and export goes through here."""
+    """Append to the audit log. Every approval and export goes through here.
+
+    The entry is hash-chained to its predecessor, so altering or removing any
+    record of who approved what breaks the chain and becomes detectable. See
+    app/services/audit_chain.py.
+    """
     client_ip = _client_ip(request)
-    db.add(
-        AuditLog(
-            actor_id=actor.id if actor else None,
-            action=action,
-            entity_type=entity_type,
-            entity_id=str(entity_id) if entity_id else None,
-            payload=payload or {},
-            ip_address=client_ip,
-        )
+
+    entry = AuditLog(
+        actor_id=actor.id if actor else None,
+        action=action,
+        entity_type=entity_type,
+        entity_id=str(entity_id) if entity_id else None,
+        payload=payload or {},
+        ip_address=client_ip,
     )
+    db.add(entry)
+
+    # Flushed before hashing because the id and created_at are part of what is
+    # committed to, and both are assigned by the database. Hashing before the
+    # flush would sign a different entry than the one stored.
+    db.flush()
+
+    try:
+        entry.prev_hash = audit_chain.latest_hash(db)
+        entry.entry_hash = audit_chain.compute_hash(
+            entry.prev_hash,
+            audit_chain.canonical_payload(
+                entry.id,
+                entry.actor_id,
+                entry.action,
+                entry.entity_type,
+                entry.entity_id,
+                entry.payload,
+                entry.created_at.isoformat() if entry.created_at else None,
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001
+        # An unchained entry is far better than a lost one. The action being
+        # audited - an approval, an export - has already happened; refusing to
+        # record it because the hash could not be computed would destroy the
+        # evidence this exists to preserve. verify_chain() reports it as
+        # unverifiable rather than silently accepting it.
+        logger.error(
+            "audit entry written WITHOUT a hash chain link: %s",
+            exc,
+            extra={"action": action, "entity_type": entity_type},
+        )
