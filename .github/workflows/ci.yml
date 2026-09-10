@@ -132,11 +132,19 @@ jobs:
           pip install -r requirements.txt
 
       - name: Apply database schema
+        # Migrations, not a hand-listed set of SQL files. The previous form
+        # applied init.sql and 002_exposure.sql by name, so a migration added
+        # afterwards never ran here and the suite failed with "column does not
+        # exist" - schema drift between CI and everywhere else, which is the
+        # exact thing Alembic was added to remove.
+        #
+        # This is also the same code path the application runs at startup, so
+        # a migration that works here works there.
+        working-directory: backend
         env:
-          PGPASSWORD: sihdev
-        run: |
-          psql -h localhost -U sih -d sih183 -f infra/postgres/init.sql
-          psql -h localhost -U sih -d sih183 -f infra/postgres/002_exposure.sql
+          DATABASE_URL: postgresql+psycopg://sih:sihdev@localhost:5432/sih183
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: python ../scripts/migrate.py
 
       - name: Wait for Neo4j to accept Bolt
         # The container health check answers as soon as the HTTP listener
